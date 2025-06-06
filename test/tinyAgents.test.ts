@@ -145,13 +145,11 @@ describe("TinyAgent with real ClientsRegistry (with external tools registered)",
     ];
 
     const agent = new TinyAgent({});
-    await agent.registry.register(
-      "stdio",
-      "hello-world-client",
-      "node",
-      [HELLO_SERVER_PATH],
-      { PATH: process.env.PATH! }
-    );
+    await agent
+      .getClientsRegistry()
+      .register("stdio", "hello-world-client", "node", [HELLO_SERVER_PATH], {
+        PATH: process.env.PATH!,
+      });
     const result: TinyAgentRunResult = await agent.run({
       openai: openaiMock as unknown as OpenAI,
       baseMessages,
@@ -215,13 +213,11 @@ describe("TinyAgent with real ClientsRegistry (with external tools registered)",
 
     const agent = new TinyAgent({});
     // Register the "hello-world" tool
-    await agent.registry.register(
-      "stdio",
-      "hello-world",
-      "node",
-      [HELLO_SERVER_PATH],
-      { PATH: process.env.PATH! }
-    );
+    await agent
+      .getClientsRegistry()
+      .register("stdio", "hello-world", "node", [HELLO_SERVER_PATH], {
+        PATH: process.env.PATH!,
+      });
 
     // Act
     const result: TinyAgentRunResult = await agent.run({

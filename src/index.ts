@@ -2,6 +2,7 @@ import { TinyAgent } from "./tinyAgents.js";
 import { OpenAI } from "openai";
 import { fileURLToPath } from "url";
 import path from "path";
+import { askQuestions } from "./utils.ts";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -21,7 +22,7 @@ const HELLO_SERVER_PATH = path.resolve(
   "fixtures",
   "helloWorldServer.js"
 );
-await agent.registry.register(
+await agent.getClientsRegistry().register(
   "stdio", // Use the stdio transport
   "hello-world", // Tool name
   "node", // Runtime
@@ -41,6 +42,7 @@ const baseMessages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
 const result = await agent.run({
   openai,
   baseMessages,
+  requestInputFromUser: askQuestions,
 });
 console.log("RESULT:", JSON.stringify(result, null, 2));
 process.exit(0);

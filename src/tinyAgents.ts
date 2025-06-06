@@ -68,7 +68,7 @@ export interface TinyAgentConfig {
  */
 export class TinyAgent {
   private readonly maxInteractions: number;
-  public registry: ClientsRegistry;
+  private readonly registry: ClientsRegistry;
 
   /**
    * @param config.maxInteractions Maximum number of LLM ↔ tool iterations (default 10).
@@ -103,8 +103,8 @@ export class TinyAgent {
   public async run(options: {
     openai: OpenAI;
     baseMessages: OpenAI.Chat.Completions.ChatCompletionMessageParam[];
+    requestInputFromUser?: (question: string) => Promise<string>;
   }): Promise<TinyAgentRunResult> {
-    // 1. Retrieve available tools from the registry
     const mcpTools = await this.registry.getTools();
     // Map MCP tools into OpenAI's ChatCompletionTool format
     const availableTools: OpenAI.Chat.ChatCompletionTool[] = mcpTools.map(
@@ -118,7 +118,6 @@ export class TinyAgent {
       })
     );
 
-    // 2. Prepare conversation arrays and telemetry collectors.
     const conversation: ConversationMessage[] = [...options.baseMessages];
     const llmCalls: LLMTelemetry[] = [];
     const toolCalls: ToolCallTelemetry[] = [];
@@ -126,18 +125,9 @@ export class TinyAgent {
     let interactionCount = 0;
     let taskCompleteAck = 0;
 
-    // 3. Main loop
     while (interactionCount < this.maxInteractions && taskCompleteAck < 2) {
       interactionCount++;
 
-      console.log(
-        "conversation at time:",
-        new Date().toISOString(),
-        " ",
-        JSON.stringify(conversation, null, 2)
-      );
-
-      // b) Call the LLM with all accumulated messages
       const llmStart = Date.now();
       const response = await options.openai.chat.completions.create({
         model: "gpt-4o-mini",
@@ -150,7 +140,6 @@ export class TinyAgent {
       const responseMessage = response.choices[0]
         .message as OpenAI.Chat.Completions.ChatCompletionMessage;
 
-      // Record LLM telemetry
       llmCalls.push({
         requestMessages: conversation,
         responseMessage,
@@ -159,10 +148,8 @@ export class TinyAgent {
         durationMs: llmEnd - llmStart,
       });
 
-      // Append the assistant’s message to the conversation
       conversation.push(responseMessage);
 
-      // c) Check if the assistant requested any tool calls
       const toolCallsRequested = responseMessage.tool_calls as
         | Array<{
             id: string;
@@ -171,13 +158,10 @@ export class TinyAgent {
         | undefined;
 
       if (!toolCallsRequested || toolCallsRequested.length === 0) {
-        // No further tool calls; exit loop
         break;
       }
 
-      // d) For each requested tool call, invoke the tool and append its output
       for (const toolCall of toolCallsRequested) {
-        console.log("Tool call requested:", JSON.stringify(toolCall, null, 2));
         const toolCallId = toolCall.id;
         const functionName = toolCall.function.name;
         const params = JSON.parse(toolCall.function.arguments || "{}");
@@ -186,14 +170,22 @@ export class TinyAgent {
         let result = "";
         if (functionName === "task_complete") {
           taskCompleteAck++;
+        } else if (functionName === "ask_question") {
+          if (typeof options.requestInputFromUser !== "function") {
+            throw new Error(
+              "Function 'ask_question' requires a requestInputFromUser callback to be provided."
+            );
+          }
+          const userResponse = await options.requestInputFromUser(
+            params.questions
+          );
+          result = userResponse;
         } else {
           result = await this.registry.callTool(toolCall);
         }
 
-        console.log("Tool result:", JSON.stringify(result, null, 2));
         const toolEnd = Date.now();
 
-        // Record tool invocation details
         toolCalls.push({
           toolCallId,
           toolName: functionName,
@@ -204,7 +196,6 @@ export class TinyAgent {
           durationMs: toolEnd - toolStart,
         });
 
-        // Append a ToolFunctionOutputMessage to the conversation
         const functionOutputMessage: ToolFunctionOutputMessage = {
           type: "function_call_output",
           tool_call_id: toolCallId,
@@ -212,14 +203,7 @@ export class TinyAgent {
           role: "tool",
         };
         conversation.push(functionOutputMessage);
-        console.log("Appended tool call in conversation...");
-        console.log(
-          "Conversation so far:",
-          JSON.stringify(conversation, null, 2)
-        );
       }
-
-      // Continue to next iteration so the model can consume the tool outputs
     }
 
     return {
