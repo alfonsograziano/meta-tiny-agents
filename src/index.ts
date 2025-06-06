@@ -43,3 +43,4 @@ const result = await agent.run({
   baseMessages,
 });
 console.log("RESULT:", JSON.stringify(result, null, 2));
+process.exit(0);

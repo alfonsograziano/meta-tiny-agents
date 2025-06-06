@@ -124,9 +124,10 @@ export class TinyAgent {
     const toolCalls: ToolCallTelemetry[] = [];
 
     let interactionCount = 0;
+    let taskCompleteAck = 0;
 
     // 3. Main loop
-    while (interactionCount < this.maxInteractions) {
+    while (interactionCount < this.maxInteractions && taskCompleteAck < 2) {
       interactionCount++;
 
       console.log(
@@ -182,7 +183,13 @@ export class TinyAgent {
         const params = JSON.parse(toolCall.function.arguments || "{}");
 
         const toolStart = Date.now();
-        const result = await this.registry.callTool(toolCall);
+        let result = "";
+        if (functionName === "task_complete") {
+          taskCompleteAck++;
+        } else {
+          result = await this.registry.callTool(toolCall);
+        }
+
         console.log("Tool result:", JSON.stringify(result, null, 2));
         const toolEnd = Date.now();
 
