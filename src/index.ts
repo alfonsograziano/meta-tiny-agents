@@ -4,9 +4,6 @@ import { fileURLToPath } from "url";
 import path from "path";
 import { askQuestions } from "./utils.ts";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY!,
 });
@@ -14,7 +11,10 @@ const openai = new OpenAI({
 // Create a TinyAgent instance
 const agent = new TinyAgent({});
 
-// Register the "hello-world" tool using the test server script
+const goal = "Design a workout routine for a beginner with no equipment.";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 const HELLO_SERVER_PATH = path.resolve(
   __dirname,
   "..",
@@ -22,20 +22,24 @@ const HELLO_SERVER_PATH = path.resolve(
   "fixtures",
   "helloWorldServer.js"
 );
-await agent.getClientsRegistry().register(
-  "stdio", // Use the stdio transport
-  "hello-world", // Tool name
-  "node", // Runtime
-  [HELLO_SERVER_PATH], // Path to the server script
-  { PATH: process.env.PATH! }
-);
+await agent
+  .getClientsRegistry()
+  .register("stdio", "hello-world", "node", [HELLO_SERVER_PATH], {
+    PATH: process.env.PATH!,
+  });
+
+const systemPrompt = await agent.generateSystemPrompt({
+  openai,
+  goal,
+});
+
+console.log("Generated System Prompt:\n", systemPrompt);
 
 const baseMessages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
-  { role: "system", content: "You are a helpful assistant." },
+  { role: "system", content: systemPrompt },
   {
     role: "user",
-    content:
-      'Please use the hello-world tool to say "Hello, Mario!" as a greeting to my friend.',
+    content: goal,
   },
 ];
 

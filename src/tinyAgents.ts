@@ -1,5 +1,10 @@
 import { ClientsRegistry } from "./clientsRegistry.js";
 import { OpenAI } from "openai";
+import {
+  getSystemPromptDesigner,
+  getSystemPromptFromAgentResponse,
+  PROMPT_DESIGNER_SYSTEM_PROMPT,
+} from "./prompts.ts";
 
 /**
  * Represents a conversation message originating from a tool function call.
@@ -129,6 +134,7 @@ export class TinyAgent {
       interactionCount++;
 
       const llmStart = Date.now();
+      //TODO: Pass model as an option
       const response = await options.openai.chat.completions.create({
         model: "gpt-4o-mini",
         messages: conversation,
@@ -161,6 +167,8 @@ export class TinyAgent {
         break;
       }
 
+      // TODO: Make executions in parallel instead of sequentially
+      // TODO: Create a tool, capable of spawning a new TinyAgent instance
       for (const toolCall of toolCallsRequested) {
         const toolCallId = toolCall.id;
         const functionName = toolCall.function.name;
@@ -211,6 +219,34 @@ export class TinyAgent {
       llmCalls,
       toolCalls,
     };
+  }
+
+  public async generateSystemPrompt(options: {
+    openai: OpenAI;
+    goal: string;
+  }): Promise<string> {
+    const result = await this.run({
+      openai: options.openai,
+      baseMessages: [
+        {
+          role: "system",
+          content: PROMPT_DESIGNER_SYSTEM_PROMPT,
+        },
+        {
+          role: "user",
+          content: getSystemPromptDesigner(options.goal),
+        },
+      ],
+    });
+    const lastMessage = result.conversation[result.conversation.length - 1];
+    if (lastMessage.role !== "assistant") {
+      throw new Error("Expected the last message to be from the assistant.");
+    }
+    const systemPrompt = lastMessage.content;
+    if (!systemPrompt) {
+      throw new Error("The system prompt is empty.");
+    }
+    return getSystemPromptFromAgentResponse(systemPrompt as string);
   }
 
   /**
