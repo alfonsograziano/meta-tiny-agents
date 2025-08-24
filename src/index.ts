@@ -21,13 +21,25 @@ const agent = new TinyAgent({
   maxInteractions: 50,
 });
 
+// Generate a realistic user-agent (desktop Chrome) like in browser.ts
+const ua =
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36";
+
 await agent
   .getClientsRegistry()
   .register(
     "stdio",
     "playwright",
     "npx",
-    ["@playwright/mcp@latest", "--user-data-dir=" + (await getProfileDir())],
+    [
+      "@playwright/mcp@latest",
+      "--user-data-dir=" + (await getProfileDir()),
+      "--browser=chrome",
+      "--no-sandbox",
+      "--viewport-size=1280,800",
+      "--user-agent=" + ua,
+      "--save-session",
+    ],
     {
       PATH: process.env.PATH!,
     }

@@ -1,6 +1,5 @@
 import { chromium, type BrowserContext } from "playwright";
 import { promises as fs } from "fs";
-import UserAgent from "user-agents";
 import { getProfileDir } from "./utils.js";
 
 async function main() {
@@ -10,8 +9,8 @@ async function main() {
   await fs.mkdir(profileDir, { recursive: true });
   console.log(`Profile directory ready at: ${profileDir}`);
 
-  // Generate a realistic user-agent (desktop Chrome)
-  const ua = new UserAgent({ platform: "MacIntel", deviceCategory: "desktop" });
+  const ua =
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36";
 
   // Launch Chromium with a persistent profile and anti-detection flags
   const context: BrowserContext = await chromium.launchPersistentContext(
