@@ -5,6 +5,7 @@ import {
   getSystemPromptFromAgentResponse,
   PROMPT_DESIGNER_SYSTEM_PROMPT,
 } from "./prompts.ts";
+import { logger } from "./logger.ts";
 
 /**
  * Represents a conversation message originating from a tool function call.
@@ -136,7 +137,7 @@ export class TinyAgent {
       const llmStart = Date.now();
       //TODO: Pass model as an option
       const response = await options.openai.chat.completions.create({
-        model: "gpt-4o-mini",
+        model: "gpt-5-mini",
         messages: conversation,
         tools: availableTools,
         tool_choice: "auto",
@@ -145,6 +146,7 @@ export class TinyAgent {
 
       const responseMessage = response.choices[0]
         .message as OpenAI.Chat.Completions.ChatCompletionMessage;
+      logger.log(`LLM response: ${JSON.stringify(responseMessage, null, 2)}`);
 
       llmCalls.push({
         requestMessages: conversation,
@@ -193,7 +195,11 @@ export class TinyAgent {
         }
 
         const toolEnd = Date.now();
-
+        logger.log(
+          `Tool call ${functionName} completed in ${
+            toolEnd - toolStart
+          }ms with params ${JSON.stringify(params, null, 2)}`
+        );
         toolCalls.push({
           toolCallId,
           toolName: functionName,
