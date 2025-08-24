@@ -45,6 +45,22 @@ export class RAGIndexer {
     const files = this.getFilesFromDir(this.docsDir);
     console.log(`Found ${files.length} files in ${this.docsDir}, indexing...`);
 
+    // Get all existing files from database
+    const existingFiles = await this.getAllFileRecords();
+
+    // Find deleted files (files in DB but not in filesystem)
+    const deletedFiles = existingFiles.filter((dbFile) => {
+      const fullPath = dbFile.path;
+      return !fs.existsSync(fullPath);
+    });
+
+    // Deindex deleted files
+    for (const deletedFile of deletedFiles) {
+      console.log(`Deindexing deleted file: ${deletedFile.path}`);
+      await this.deleteFileRecord(deletedFile.id);
+    }
+
+    // Process existing files (index new/modified ones)
     for (const file of files) {
       const filePath = path.join(this.docsDir, file);
       const stat = fs.statSync(filePath);
@@ -171,6 +187,17 @@ export class RAGIndexer {
         [fileId, i, chunks[i], `[${embeddings[i].join(",")}]`]
       );
     }
+  }
+
+  private async getAllFileRecords(): Promise<any[]> {
+    const res = await this.pool.query("SELECT * FROM files");
+    return res.rows;
+  }
+
+  private async deleteFileRecord(fileId: number) {
+    // Due to CASCADE constraint, deleting from files will automatically
+    // delete all related chunks from file_chunks table
+    await this.pool.query("DELETE FROM files WHERE id = $1", [fileId]);
   }
 
   private getFilesFromDir(dir: string): string[] {

@@ -8,7 +8,7 @@
     "test:coverage": "vitest --coverage",
     "dev": "tsx --env-file .env src/index.ts",
     "start-browser": "tsx src/browser.ts",
-    "start-rag": "tsx --env-file .env src/ragSync.ts"
+    "sync-rag": "tsx --env-file .env src/ragSync.ts"
   },
   "author": "",
   "license": "ISC",
