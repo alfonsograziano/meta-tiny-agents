@@ -167,4 +167,18 @@ export class ClientsRegistry {
       arguments: argsObject,
     });
   }
+
+  public async closeClient(name: string): Promise<void> {
+    const client = this.clients[name];
+    if (!client) {
+      throw new Error(`Client "${name}" is not registered.`);
+    }
+    await client.close();
+  }
+
+  public async cleanup(): Promise<void> {
+    await Promise.all(
+      Object.keys(this.clients).map((key) => this.closeClient(key))
+    );
+  }
 }
