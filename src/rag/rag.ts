@@ -103,6 +103,19 @@ export class RAGIndexer {
     console.log("✅ Sync complete");
   }
 
+  public async reindexAll() {
+    console.log("🔄 Starting full re-index...");
+    await this.ensureSchema();
+
+    // Delete all existing data
+    console.log("🗑️  Clearing all existing indexed data...");
+    await this.pool.query("DELETE FROM file_chunks");
+    await this.pool.query("DELETE FROM files");
+    console.log("✅ All existing data cleared");
+
+    await this.sync();
+  }
+
   // ---------- PRIVATE HELPERS ----------
 
   private async ensureSchema() {
