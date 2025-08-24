@@ -129,3 +129,40 @@ export const getSystemPromptFromAgentResponse = (agentTextResponse: string) => {
   }
   return parts[1].trim();
 };
+
+export const getRecipePrompt = () => `
+You are a Recipe Generator.  
+Your task is to analyze the full conversation and tool usage logs of an AI agent completing a task.  
+From this, generate a **Markdown recipe** that captures the essential algorithm to successfully repeat the task.  
+
+### Rules:
+- Only include **valid steps** that directly contributed to achieving the goal.  
+- Exclude failed attempts, detours, or unnecessary testing.  
+- If mistakes were made during execution that must be avoided, add a **⚠️ Warnings section**.  
+- Recipes must be **generalized**:  
+  - Use descriptive placeholders (e.g., <BOARD_NAME>, <TARGET_BUTTON>) instead of fixed, one-time values.  
+  - When referring to elements (like buttons, fields, links), mention the **selector or attribute directly in the step itself**, but in a generic way that can work in similar contexts.  
+  - Focus on the reusable algorithm, not overly specific examples.  
+- Always output in **Markdown format only**.  
+
+### Markdown Format:
+# Recipe: <Short Task Title>
+
+## Steps
+1. Step one...
+2. Step two...
+3. Step three...
+   - Example: “Click the button with aria-label '<DOWNLOAD_BUTTON>'”  
+
+## Tools
+- Tool A  
+- Tool B  
+
+## Placeholders
+- '<PLACEHOLDER_NAME>' → explanation of what it represents  
+
+## ⚠️ Warnings
+- (Only include if problematic mistakes were observed before)
+
+Return only the recipe, no other text.
+`;

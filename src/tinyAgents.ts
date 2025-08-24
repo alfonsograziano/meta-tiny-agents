@@ -1,6 +1,7 @@
 import { ClientsRegistry } from "./clientsRegistry.js";
 import { OpenAI } from "openai";
 import {
+  getRecipePrompt,
   getSystemPromptDesigner,
   getSystemPromptFromAgentResponse,
   PROMPT_DESIGNER_SYSTEM_PROMPT,
@@ -253,6 +254,29 @@ export class TinyAgent {
       throw new Error("The system prompt is empty.");
     }
     return getSystemPromptFromAgentResponse(systemPrompt as string);
+  }
+
+  public async generateRecipe(options: {
+    openai: OpenAI;
+    baseMessages: OpenAI.Chat.Completions.ChatCompletionMessageParam[];
+  }): Promise<string> {
+    const conversation: ConversationMessage[] = [
+      ...options.baseMessages,
+      {
+        role: "user",
+        content: getRecipePrompt(),
+      },
+    ];
+
+    const result = await this.run({
+      openai: options.openai,
+      baseMessages: conversation,
+    });
+    const lastMessage = result.conversation[result.conversation.length - 1];
+    if (lastMessage.role !== "assistant") {
+      throw new Error("Expected the last message to be from the assistant.");
+    }
+    return lastMessage.content as string;
   }
 
   /**
