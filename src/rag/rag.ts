@@ -126,57 +126,51 @@ export class RAGIndexer {
     `);
   }
 
-  private chunkText(text: string, size: number): string[] {
+  // Drop-in: same name + (optional) overlap parameter via a default.
+  private chunkText(
+    text: string,
+    size: number,
+    overlap: number = Math.floor(size * 0.15)
+  ): string[] {
     if (typeof text !== "string") return [];
     if (!Number.isFinite(size) || size <= 0) return [text];
+    if (!Number.isFinite(overlap) || overlap < 0) overlap = 0;
+    if (overlap >= size) overlap = Math.max(0, Math.floor(size / 3)); // keep sane
 
-    // Ordered from strongest to weakest boundaries (LangChain-style).
-    const SEPARATORS = ["\n\n", "\n", " ", ""]; // paragraphs -> lines -> words -> characters
+    const SEPARATORS = ["\n\n", "\n", " ", ""]; // paragraphs -> lines -> words -> chars
 
-    // Core recursive splitter
     const splitRecursive = (
       input: string,
       max: number,
       seps: string[]
     ): string[] => {
-      const t = input; // keep original whitespace; don't normalize so we preserve meaning
+      const t = input;
       if (t.length <= max) return [t];
 
       for (let i = 0; i < seps.length; i++) {
         const sep = seps[i];
 
-        // Final fallback: fixed-size character slicing
         if (sep === "") {
           const out: string[] = [];
-          for (let j = 0; j < t.length; j += max) {
-            out.push(t.slice(j, j + max));
-          }
+          for (let j = 0; j < t.length; j += max) out.push(t.slice(j, j + max));
           return out;
         }
 
         if (t.includes(sep)) {
-          // 1) Split by the current separator
           const rawParts = t.split(sep);
-
-          // 2) Ensure each part ≤ max by splitting further with the *next* separator
           const parts: string[] = [];
           for (const part of rawParts) {
-            if (!part) continue; // skip empties
+            if (!part) continue;
             if (part.length <= max) {
               parts.push(part);
             } else {
-              const deeper = splitRecursive(part, max, seps.slice(i + 1));
-              for (const d of deeper) {
-                if (d) parts.push(d);
-              }
+              parts.push(...splitRecursive(part, max, seps.slice(i + 1)));
             }
           }
 
-          // 3) Merge parts back together, re-inserting the separator,
-          //    without exceeding the max size.
-          const chunks: string[] = [];
+          // Merge with max size constraint
+          const baseChunks: string[] = [];
           let current = "";
-
           for (const p of parts) {
             if (!p) continue;
             if (current.length === 0) {
@@ -184,16 +178,48 @@ export class RAGIndexer {
             } else if (current.length + sep.length + p.length <= max) {
               current += sep + p;
             } else {
-              chunks.push(current);
+              baseChunks.push(current);
               current = p;
             }
           }
-          if (current) chunks.push(current);
-          return chunks;
+          if (current) baseChunks.push(current);
+
+          // Apply overlap: start each subsequent chunk with a suffix of the previous one.
+          if (overlap <= 0 || baseChunks.length <= 1) return baseChunks;
+
+          const overlapped: string[] = [];
+          overlapped.push(baseChunks[0]); // first chunk unchanged
+
+          for (let k = 1; k < baseChunks.length; k++) {
+            const prev = overlapped[overlapped.length - 1];
+            const seed = prev.slice(Math.max(0, prev.length - overlap)); // suffix
+
+            let next = baseChunks[k];
+
+            // If adding the seed exceeds max, trim the front of `next` just enough.
+            const available = size - seed.length;
+            if (available <= 0) {
+              // Seed alone fills (or exceeds) the budget; fall back to cropping seed.
+              const croppedSeed = seed.slice(-Math.max(0, size - 1));
+              overlapped.push(croppedSeed);
+              // Re-insert the remainder of `next` as further chunks respecting size
+              let rest = next;
+              while (rest.length > 0) {
+                overlapped.push(rest.slice(0, size));
+                rest = rest.slice(size);
+              }
+              continue;
+            }
+            if (next.length > available) {
+              next = next.slice(0, available);
+            }
+            overlapped.push(seed + next);
+          }
+          return overlapped;
         }
       }
 
-      // Shouldn't reach here, but just in case:
+      // Safety fallback
       const out: string[] = [];
       for (let i = 0; i < t.length; i += max) out.push(t.slice(i, i + max));
       return out;
