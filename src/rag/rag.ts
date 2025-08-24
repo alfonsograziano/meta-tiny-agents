@@ -127,11 +127,79 @@ export class RAGIndexer {
   }
 
   private chunkText(text: string, size: number): string[] {
-    const chunks: string[] = [];
-    for (let i = 0; i < text.length; i += size) {
-      chunks.push(text.slice(i, i + size));
-    }
-    return chunks;
+    if (typeof text !== "string") return [];
+    if (!Number.isFinite(size) || size <= 0) return [text];
+
+    // Ordered from strongest to weakest boundaries (LangChain-style).
+    const SEPARATORS = ["\n\n", "\n", " ", ""]; // paragraphs -> lines -> words -> characters
+
+    // Core recursive splitter
+    const splitRecursive = (
+      input: string,
+      max: number,
+      seps: string[]
+    ): string[] => {
+      const t = input; // keep original whitespace; don't normalize so we preserve meaning
+      if (t.length <= max) return [t];
+
+      for (let i = 0; i < seps.length; i++) {
+        const sep = seps[i];
+
+        // Final fallback: fixed-size character slicing
+        if (sep === "") {
+          const out: string[] = [];
+          for (let j = 0; j < t.length; j += max) {
+            out.push(t.slice(j, j + max));
+          }
+          return out;
+        }
+
+        if (t.includes(sep)) {
+          // 1) Split by the current separator
+          const rawParts = t.split(sep);
+
+          // 2) Ensure each part ≤ max by splitting further with the *next* separator
+          const parts: string[] = [];
+          for (const part of rawParts) {
+            if (!part) continue; // skip empties
+            if (part.length <= max) {
+              parts.push(part);
+            } else {
+              const deeper = splitRecursive(part, max, seps.slice(i + 1));
+              for (const d of deeper) {
+                if (d) parts.push(d);
+              }
+            }
+          }
+
+          // 3) Merge parts back together, re-inserting the separator,
+          //    without exceeding the max size.
+          const chunks: string[] = [];
+          let current = "";
+
+          for (const p of parts) {
+            if (!p) continue;
+            if (current.length === 0) {
+              current = p;
+            } else if (current.length + sep.length + p.length <= max) {
+              current += sep + p;
+            } else {
+              chunks.push(current);
+              current = p;
+            }
+          }
+          if (current) chunks.push(current);
+          return chunks;
+        }
+      }
+
+      // Shouldn't reach here, but just in case:
+      const out: string[] = [];
+      for (let i = 0; i < t.length; i += max) out.push(t.slice(i, i + max));
+      return out;
+    };
+
+    return splitRecursive(text, size, SEPARATORS);
   }
 
   private async embedText(texts: string[]): Promise<number[][]> {
