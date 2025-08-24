@@ -7,6 +7,7 @@ import {
   PROMPT_DESIGNER_SYSTEM_PROMPT,
 } from "./prompts.ts";
 import { logger } from "./logger.ts";
+import { RAGQuery } from "./rag/index.js";
 
 /**
  * Represents a conversation message originating from a tool function call.
@@ -86,15 +87,54 @@ export class TinyAgent {
   }
 
   /**
+   * Performs RAG retrieval if enabled and a query is provided.
+   * @returns Promise<string> The formatted RAG context or empty string if RAG is disabled
+   */
+  private async performRAGRetrieval(
+    ragQuery: string,
+    ragResultsCount: number
+  ): Promise<string> {
+    try {
+      logger.log(`Performing RAG retrieval for query: ${ragQuery}`);
+      const ragQueryInstance = new RAGQuery();
+      const results = await ragQueryInstance.query(ragQuery, ragResultsCount);
+
+      if (results.length === 0) {
+        logger.log("No RAG results found");
+        return "";
+      }
+
+      const context = results
+        .map((result, index) => {
+          return `[Document ${index + 1} - ${result.file}]\n${
+            result.content
+          }\n`;
+        })
+        .join("\n");
+
+      const ragContext = `\n--- RELEVANT CONTEXT FROM KNOWLEDGE BASE ---\n${context}\n--- END CONTEXT ---\n\nBased on the above context, please proceed with the user's request.`;
+
+      logger.log(`RAG retrieval completed with ${results.length} results`);
+      return ragContext;
+    } catch (error) {
+      logger.log(`RAG retrieval failed: ${error}`);
+      return "";
+    }
+  }
+
+  /**
    * Runs the TinyAgent loop.
    *
    * @param options.openai      An instantiated OpenAI client.
    * @param options.baseMessages An array of initial messages to prime the LLM.
+   * @param options.ragQuery    Optional RAG query to retrieve relevant context.
+   * @param options.ragResultsCount Number of RAG results to retrieve (default 5).
    *
    * The TinyAgent will:
-   *  1. Retrieve available tools from its ClientsRegistry.
-   *  2. Enter a loop up to maxInteractions times (or until the model stops requesting tools).
-   *  3. For each iteration:
+   *  1. Perform RAG retrieval if a query is provided.
+   *  2. Retrieve available tools from its ClientsRegistry.
+   *  3. Enter a loop up to maxInteractions times (or until the model stops requesting tools).
+   *  4. For each iteration:
    *     - Send all accumulated messages to openai.chat.completions.create(), measuring telemetry.
    *     - If the model requests one or more tool calls (via message.tool_calls), invoke each
    *       using ClientsRegistry.callTool(), measuring telemetry, and append the outputs as
@@ -111,7 +151,40 @@ export class TinyAgent {
     openai: OpenAI;
     baseMessages: OpenAI.Chat.Completions.ChatCompletionMessageParam[];
     requestInputFromUser?: (question: string) => Promise<string>;
+    ragQuery?: string;
+    ragResultsCount?: number;
   }): Promise<TinyAgentRunResult> {
+    // Perform RAG retrieval if a query is provided
+    let ragContext = "";
+    if (options.ragQuery) {
+      const ragResultsCount = options.ragResultsCount ?? 5;
+      ragContext = await this.performRAGRetrieval(
+        options.ragQuery,
+        ragResultsCount
+      );
+    }
+
+    // Add RAG context to base messages if available
+    const enhancedBaseMessages = [...options.baseMessages];
+    if (ragContext) {
+      // Insert RAG context after system message but before user messages
+      const systemMessageIndex = enhancedBaseMessages.findIndex(
+        (msg) => msg.role === "system"
+      );
+      if (systemMessageIndex >= 0) {
+        enhancedBaseMessages.splice(systemMessageIndex + 1, 0, {
+          role: "system",
+          content: ragContext,
+        });
+      } else {
+        // If no system message, prepend RAG context
+        enhancedBaseMessages.unshift({
+          role: "system",
+          content: ragContext,
+        });
+      }
+    }
+
     const mcpTools = await this.registry.getTools();
     // Map MCP tools into OpenAI's ChatCompletionTool format
     const availableTools: OpenAI.Chat.ChatCompletionTool[] = mcpTools.map(
@@ -125,7 +198,7 @@ export class TinyAgent {
       })
     );
 
-    const conversation: ConversationMessage[] = [...options.baseMessages];
+    const conversation: ConversationMessage[] = [...enhancedBaseMessages];
     const llmCalls: LLMTelemetry[] = [];
     const toolCalls: ToolCallTelemetry[] = [];
 
@@ -231,6 +304,8 @@ export class TinyAgent {
   public async generateSystemPrompt(options: {
     openai: OpenAI;
     goal: string;
+    ragQuery?: string;
+    ragResultsCount?: number;
   }): Promise<string> {
     const result = await this.run({
       openai: options.openai,
@@ -244,6 +319,8 @@ export class TinyAgent {
           content: getSystemPromptDesigner(options.goal),
         },
       ],
+      ragQuery: options.ragQuery,
+      ragResultsCount: options.ragResultsCount,
     });
     const lastMessage = result.conversation[result.conversation.length - 1];
     if (lastMessage.role !== "assistant") {
@@ -259,6 +336,8 @@ export class TinyAgent {
   public async generateRecipe(options: {
     openai: OpenAI;
     baseMessages: OpenAI.Chat.Completions.ChatCompletionMessageParam[];
+    ragQuery?: string;
+    ragResultsCount?: number;
   }): Promise<string> {
     const conversation: ConversationMessage[] = [
       ...options.baseMessages,
@@ -271,6 +350,8 @@ export class TinyAgent {
     const result = await this.run({
       openai: options.openai,
       baseMessages: conversation,
+      ragQuery: options.ragQuery,
+      ragResultsCount: options.ragResultsCount,
     });
     const lastMessage = result.conversation[result.conversation.length - 1];
     if (lastMessage.role !== "assistant") {

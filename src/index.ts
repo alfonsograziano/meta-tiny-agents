@@ -88,21 +88,23 @@ const result = await agent.run({
   openai,
   baseMessages,
   requestInputFromUser: input,
+  ragQuery: goal,
+  ragResultsCount: 5,
 });
 
-const recipe = await agent.generateRecipe({
-  openai,
-  baseMessages: result.conversation,
-});
+// const recipe = await agent.generateRecipe({
+//   openai,
+//   baseMessages: result.conversation,
+// });
 
-const recipeFile = path.resolve(
-  path.dirname(new URL(import.meta.url).pathname),
-  "../context/recipe.md"
-);
-if (!fs.existsSync(recipeFile)) {
-  fs.writeFileSync(recipeFile, "");
-}
-fs.appendFileSync(recipeFile, recipe);
+// const recipeFile = path.resolve(
+//   path.dirname(new URL(import.meta.url).pathname),
+//   "../context/recipe.md"
+// );
+// if (!fs.existsSync(recipeFile)) {
+//   fs.writeFileSync(recipeFile, "");
+// }
+// fs.appendFileSync(recipeFile, recipe);
 
 // Save the result to a /results/new Date.json file
 const resultsDir = path.resolve(
