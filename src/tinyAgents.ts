@@ -152,6 +152,7 @@ export class TinyAgent {
     ragQuery?: string;
     ragResultsCount?: number;
     model: string;
+    onStreamAnswer?: (content: string) => void;
   }): Promise<TinyAgentRunResult> {
     // Perform RAG retrieval if a query is provided
     let ragContext = "";
@@ -208,16 +209,71 @@ export class TinyAgent {
       interactionCount++;
 
       const llmStart = Date.now();
-      const response = await options.openai.chat.completions.create({
-        model: options.model,
-        messages: conversation,
-        tools: availableTools,
-        tool_choice: "auto",
-      });
-      const llmEnd = Date.now();
 
-      const responseMessage = response.choices[0]
-        .message as OpenAI.Chat.Completions.ChatCompletionMessage;
+      let responseMessage: OpenAI.Chat.Completions.ChatCompletionMessage;
+
+      if (options.onStreamAnswer) {
+        // Use streaming for text responses
+        const stream = await options.openai.chat.completions.create({
+          model: options.model,
+          messages: conversation,
+          tools: availableTools,
+          tool_choice: "auto",
+          stream: true,
+        });
+
+        let accumulatedContent = "";
+        let hasToolCalls = false;
+
+        for await (const chunk of stream) {
+          const delta = chunk.choices[0]?.delta;
+          if (!delta) continue;
+
+          if (delta.tool_calls) {
+            hasToolCalls = true;
+            // For tool calls, we need to accumulate the full response
+            // We'll break out of streaming and make a non-streaming call
+            break;
+          }
+
+          if (delta.content) {
+            accumulatedContent += delta.content;
+            options.onStreamAnswer(delta.content);
+          }
+        }
+
+        if (hasToolCalls) {
+          // Make a non-streaming call for tool calls
+          const nonStreamResponse =
+            await options.openai.chat.completions.create({
+              model: options.model,
+              messages: conversation,
+              tools: availableTools,
+              tool_choice: "auto",
+              stream: false,
+            });
+          responseMessage = nonStreamResponse.choices[0]
+            .message as OpenAI.Chat.Completions.ChatCompletionMessage;
+        } else {
+          // Create a message object from the accumulated content
+          responseMessage = {
+            role: "assistant",
+            content: accumulatedContent,
+          } as OpenAI.Chat.Completions.ChatCompletionMessage;
+        }
+      } else {
+        // Non-streaming call
+        const response = await options.openai.chat.completions.create({
+          model: options.model,
+          messages: conversation,
+          tools: availableTools,
+          tool_choice: "auto",
+        });
+        responseMessage = response.choices[0]
+          .message as OpenAI.Chat.Completions.ChatCompletionMessage;
+      }
+
+      const llmEnd = Date.now();
 
       llmCalls.push({
         requestMessages: conversation,

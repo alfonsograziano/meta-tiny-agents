@@ -23,7 +23,7 @@ export const printUserMessage = (message: string) => {
 };
 
 export const printAgentMessage = (message: string) => {
-  console.log(styleText("green", message));
+  console.log(styleText("white", message));
 };
 
 export const printMcpMessage = (message: string) => {

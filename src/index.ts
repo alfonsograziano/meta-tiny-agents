@@ -146,17 +146,36 @@ while (true) {
   }
 
   const start = Date.now();
+
+  // Create streaming callback for real-time output
+  let streamedContent = "";
+  const onStreamAnswer = (chunk: string) => {
+    process.stdout.write(chunk);
+    streamedContent += chunk;
+  };
+
   const result = await agent.run({
     openai,
     baseMessages,
     requestInputFromUser: promptUser,
     model: agentConfig.model,
+    onStreamAnswer,
   });
   const elapsedTime = (Date.now() - start) / 1000;
+
+  // Add a newline after streaming is complete
+  if (streamedContent) {
+    console.log();
+  }
+
   printSystemMessage(`Answer generated in ${elapsedTime.toFixed(2)}s\n\n`);
 
   const agentAnswer = result.conversation[result.conversation.length - 1];
-  printAgentMessage("Answer: " + agentAnswer.content);
+
+  // Only print the final message if we didn't stream it
+  if (!streamedContent) {
+    printAgentMessage(agentAnswer.content as string);
+  }
 
   baseMessages = [...result.conversation];
 }
