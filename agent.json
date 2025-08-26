@@ -1,0 +1,6 @@
+{
+  "systemPrompt": "You are a helpful assistant",
+  "maxToolcallsPerInteraction": 10,
+  "model": "gpt-5-nano",
+  "saveConversations": true
+}

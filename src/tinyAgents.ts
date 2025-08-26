@@ -6,8 +6,8 @@ import {
   getSystemPromptFromAgentResponse,
   PROMPT_DESIGNER_SYSTEM_PROMPT,
 } from "./prompts.ts";
-import { logger } from "./logger.ts";
 import { RAGQuery } from "./rag/index.js";
+import { printAgentMessage } from "./cli.ts";
 
 /**
  * Represents a conversation message originating from a tool function call.
@@ -95,12 +95,10 @@ export class TinyAgent {
     ragResultsCount: number
   ): Promise<string> {
     try {
-      logger.log(`Performing RAG retrieval for query: ${ragQuery}`);
       const ragQueryInstance = new RAGQuery();
       const results = await ragQueryInstance.query(ragQuery, ragResultsCount);
 
       if (results.length === 0) {
-        logger.log("No RAG results found");
         return "";
       }
 
@@ -114,10 +112,8 @@ export class TinyAgent {
 
       const ragContext = `\n--- RELEVANT CONTEXT FROM KNOWLEDGE BASE ---\n${context}\n--- END CONTEXT ---\n\nBased on the above context, please proceed with the user's request.`;
 
-      logger.log(`RAG retrieval completed with ${results.length} results`);
       return ragContext;
     } catch (error) {
-      logger.log(`RAG retrieval failed: ${error}`);
       return "";
     }
   }
@@ -150,9 +146,12 @@ export class TinyAgent {
   public async run(options: {
     openai: OpenAI;
     baseMessages: OpenAI.Chat.Completions.ChatCompletionMessageParam[];
-    requestInputFromUser?: (question: string) => Promise<string>;
+    requestInputFromUser?: (question: string) => Promise<{
+      input: string;
+    }>;
     ragQuery?: string;
     ragResultsCount?: number;
+    model: string;
   }): Promise<TinyAgentRunResult> {
     // Perform RAG retrieval if a query is provided
     let ragContext = "";
@@ -209,9 +208,8 @@ export class TinyAgent {
       interactionCount++;
 
       const llmStart = Date.now();
-      //TODO: Pass model as an option
       const response = await options.openai.chat.completions.create({
-        model: "gpt-5-mini",
+        model: options.model,
         messages: conversation,
         tools: availableTools,
         tool_choice: "auto",
@@ -220,7 +218,6 @@ export class TinyAgent {
 
       const responseMessage = response.choices[0]
         .message as OpenAI.Chat.Completions.ChatCompletionMessage;
-      logger.log(`LLM response: ${JSON.stringify(responseMessage, null, 2)}`);
 
       llmCalls.push({
         requestMessages: conversation,
@@ -250,6 +247,8 @@ export class TinyAgent {
         const functionName = toolCall.function.name;
         const params = JSON.parse(toolCall.function.arguments || "{}");
 
+        printAgentMessage(`The agent is calling the tool ${functionName}`);
+
         const toolStart = Date.now();
         let result = "";
         if (functionName === "task_complete") {
@@ -260,20 +259,22 @@ export class TinyAgent {
               "Function 'ask_question' requires a requestInputFromUser callback to be provided."
             );
           }
-          const userResponse = await options.requestInputFromUser(
+          const { input } = await options.requestInputFromUser(
             params.questions
           );
-          result = userResponse;
+          result = input;
         } else {
           result = await this.registry.callTool(toolCall);
         }
 
         const toolEnd = Date.now();
-        logger.log(
-          `Tool call ${functionName} completed in ${
-            toolEnd - toolStart
-          }ms with params ${JSON.stringify(params, null, 2)}`
+        printAgentMessage(
+          `${functionName} completed in ${(
+            (toolEnd - toolStart) /
+            1000
+          ).toFixed(2)}s`
         );
+
         toolCalls.push({
           toolCallId,
           toolName: functionName,
@@ -306,6 +307,7 @@ export class TinyAgent {
     goal: string;
     ragQuery?: string;
     ragResultsCount?: number;
+    model: string;
   }): Promise<string> {
     const result = await this.run({
       openai: options.openai,
@@ -321,6 +323,7 @@ export class TinyAgent {
       ],
       ragQuery: options.ragQuery,
       ragResultsCount: options.ragResultsCount,
+      model: options.model,
     });
     const lastMessage = result.conversation[result.conversation.length - 1];
     if (lastMessage.role !== "assistant") {
@@ -338,6 +341,7 @@ export class TinyAgent {
     baseMessages: OpenAI.Chat.Completions.ChatCompletionMessageParam[];
     ragQuery?: string;
     ragResultsCount?: number;
+    model: string;
   }): Promise<string> {
     const conversation: ConversationMessage[] = [
       ...options.baseMessages,
@@ -352,6 +356,7 @@ export class TinyAgent {
       baseMessages: conversation,
       ragQuery: options.ragQuery,
       ragResultsCount: options.ragResultsCount,
+      model: options.model,
     });
     const lastMessage = result.conversation[result.conversation.length - 1];
     if (lastMessage.role !== "assistant") {

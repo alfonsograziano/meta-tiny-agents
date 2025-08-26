@@ -1,20 +1,6 @@
 import path from "path";
-import readline from "readline";
 import { promises as fs } from "fs";
 import { fileURLToPath } from "url";
-
-const rl = readline.createInterface({
-  input: process.stdin,
-  output: process.stdout,
-});
-
-export async function input(text: string): Promise<string> {
-  return new Promise((resolve) => {
-    rl.question("\n" + text + "\nAnswer here: ", (input) => {
-      resolve(input.trim());
-    });
-  });
-}
 
 export const getContext = async () => {
   // Load all the MD files in the context folder

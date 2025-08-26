@@ -94,7 +94,14 @@ export class ClientsRegistry {
         command,
         args,
         env,
+        stderr: "pipe",
       });
+
+      if (transport.stderr) {
+        transport.stderr.on("data", () => {
+          // no-op: silently discard logs
+        });
+      }
     } else {
       throw new Error(`Unsupported transport type: ${transportType}`);
     }
@@ -130,6 +137,10 @@ export class ClientsRegistry {
     );
 
     return [...this.defaultTools, ...availableToolsFromClients];
+  }
+
+  public async getClientsNames(): Promise<string[]> {
+    return Object.keys(this.clients);
   }
 
   /**
