@@ -1,4 +1,4 @@
-import { RAGIndexer } from "./rag/rag.ts";
+import { RAG } from "./rag/rag.ts";
 
-const indexer = new RAGIndexer();
-indexer.sync().catch(console.error);
+const rag = new RAG();
+rag.sync().catch(console.error);

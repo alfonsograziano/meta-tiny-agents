@@ -5,7 +5,7 @@ import OpenAI from "openai";
 import type { FileAdapter } from "./adapters/FileAdapter.ts";
 import { TextAdapter, PdfAdapter } from "./adapters/index.ts";
 
-type Env = {
+export type Env = {
   OPENAI_API_KEY?: string;
   PGHOST?: string;
   PGPORT?: string;
@@ -15,14 +15,20 @@ type Env = {
   DOCS_DIR?: string;
 };
 
-export class RAGIndexer {
+export class RAG {
   private pool: Pool;
   private openai: OpenAI;
   private docsDir: string;
   private readonly CHUNK_SIZE = 500;
   private adapters: FileAdapter[];
+  private logsAllowed: boolean;
 
-  constructor(env: Env = process.env as Env) {
+  constructor(
+    env: Env = process.env as Env,
+    config?: {
+      logsAllowed?: boolean;
+    }
+  ) {
     if (!env.OPENAI_API_KEY) throw new Error("Missing OPENAI_API_KEY");
     if (!env.DOCS_DIR) throw new Error("Missing DOCS_DIR");
 
@@ -37,13 +43,14 @@ export class RAGIndexer {
     this.openai = new OpenAI({ apiKey: env.OPENAI_API_KEY });
     this.docsDir = env.DOCS_DIR;
     this.adapters = [new TextAdapter(), new PdfAdapter()];
+    this.logsAllowed = config ? config.logsAllowed ?? false : false;
   }
 
   public async sync() {
     await this.ensureSchema();
 
     const files = this.getFilesFromDir(this.docsDir);
-    console.log(`Found ${files.length} files in ${this.docsDir}, indexing...`);
+    this.log(`Found ${files.length} files in ${this.docsDir}, indexing...`);
 
     // Get all existing files from database
     const existingFiles = await this.getAllFileRecords();
@@ -56,7 +63,7 @@ export class RAGIndexer {
 
     // Deindex deleted files
     for (const deletedFile of deletedFiles) {
-      console.log(`Deindexing deleted file: ${deletedFile.path}`);
+      this.log(`Deindexing deleted file: ${deletedFile.path}`);
       await this.deleteFileRecord(deletedFile.id);
     }
 
@@ -73,11 +80,11 @@ export class RAGIndexer {
         existing &&
         new Date(existing.last_modified).getTime() === lastModified.getTime()
       ) {
-        console.log(`Skipping unchanged file: ${file}`);
+        this.log(`Skipping unchanged file: ${file}`);
         continue;
       }
 
-      console.log(`Indexing file: ${file}`);
+      this.log(`Indexing file: ${file}`);
 
       const adapter = this.adapters.find((a) => a.supports(filePath));
       if (!adapter) {
@@ -100,19 +107,58 @@ export class RAGIndexer {
     }
 
     await this.pool.end();
-    console.log("✅ Sync complete");
+    this.log("✅ Sync complete");
   }
 
   public async reindexAll() {
-    console.log("🔄 Starting full re-index...");
+    this.log("🔄 Starting full re-index...");
     await this.ensureSchema();
 
     // Delete all existing data
-    console.log("🗑️  Clearing all existing indexed data...");
+    this.log("🗑️  Clearing all existing indexed data...");
     await this.pool.query("DELETE FROM file_chunks");
     await this.pool.query("DELETE FROM files");
-    console.log("✅ All existing data cleared");
+    this.log("✅ All existing data cleared");
 
+    await this.sync();
+  }
+
+  public async query(query: string, k: number = 5) {
+    // 1. Generate embedding
+    const embedding = await this.embedText([query]);
+
+    // 2. Search DB
+    const res = await this.pool.query(
+      `
+      SELECT
+        file_chunks.id,
+        file_chunks.content,
+        files.path,
+        file_chunks.embedding <-> $1::vector AS distance
+      FROM file_chunks
+      JOIN files ON file_chunks.file_id = files.id
+      ORDER BY file_chunks.embedding <-> $1::vector
+      LIMIT $2
+    `,
+      [`[${embedding.join(",")}]`, k]
+    );
+
+    return res.rows.map((row) => ({
+      id: row.id,
+      file: row.path,
+      content: row.content,
+      score: 1 - row.distance, // cosine similarity (closer to 1 = more similar)
+    }));
+  }
+
+  public async indexText(data: string) {
+    // Under the hoods, this will create a new file in the /memory directory
+    const memoryDir = path.join(this.docsDir, "memory");
+    if (!fs.existsSync(memoryDir)) {
+      fs.mkdirSync(memoryDir);
+    }
+    const filePath = path.join(memoryDir, `${Date.now()}.txt`);
+    fs.writeFileSync(filePath, data);
     await this.sync();
   }
 
@@ -309,18 +355,22 @@ export class RAGIndexer {
 
   private getFilesFromDir(dir: string): string[] {
     const allEntries = fs.readdirSync(dir, { recursive: true }) as string[];
-    console.log("Raw entries from readdirSync:", allEntries);
+    this.log("Raw entries from readdirSync:", allEntries);
 
     const files = allEntries.filter((entry) => {
       const fullPath = path.join(dir, entry);
       const isFile = fs.statSync(fullPath).isFile();
-      console.log(
-        `Entry: ${entry}, Full path: ${fullPath}, Is file: ${isFile}`
-      );
+      this.log(`Entry: ${entry}, Full path: ${fullPath}, Is file: ${isFile}`);
       return isFile;
     });
 
-    console.log("Filtered files:", files);
+    this.log("Filtered files:", files);
     return files;
+  }
+
+  private log(...args: any[]) {
+    if (this.logsAllowed) {
+      console.log(...args);
+    }
   }
 }

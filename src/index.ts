@@ -3,6 +3,7 @@ import { OpenAI } from "openai";
 import { getContextString, getProfileDir, getWorkspaceDir } from "./utils.js";
 import {
   getAvailableCommandsString,
+  printAgentMessage,
   printLogo,
   printSystemMessage,
   promptUser,
@@ -19,7 +20,7 @@ const agent = new TinyAgent({
 
 printLogo();
 
-printSystemMessage("Welcome to Tiny Agents - let's get started!");
+printSystemMessage("Welcome to Tiny Agent - let's get started!");
 printSystemMessage("--------------------------------");
 printSystemMessage("Initializing MCP clients...");
 
@@ -60,10 +61,6 @@ const clients = [
       {
         PATH: process.env.PATH!,
         FILES_DIR: await getWorkspaceDir(),
-        NODE_ENV: "production",
-        DEBUG: "",
-        MCP_LOG_LEVEL: "error",
-        MCP_QUIET: "true",
       }
     )
     .then(() => {
@@ -82,14 +79,18 @@ const clients = [
       ],
       {
         PATH: process.env.PATH!,
-        NODE_ENV: "production",
-        DEBUG: "",
-        MCP_LOG_LEVEL: "error",
-        MCP_QUIET: "true",
       }
     )
     .then(() => {
       console.log("[MCP]: Filesystem client initialized");
+    }),
+  agent
+    .getClientsRegistry()
+    .register("stdio", "memory", "npm", ["run", "start-rag-mcp"], {
+      PATH: process.env.PATH!,
+    })
+    .then(() => {
+      console.log("[MCP]: RAG Memory client initialized");
     }),
 ];
 
@@ -152,10 +153,10 @@ while (true) {
     model: agentConfig.model,
   });
   const elapsedTime = (Date.now() - start) / 1000;
-  console.log(`Answer generated in ${elapsedTime.toFixed(2)}s\n\n`);
+  printSystemMessage(`Answer generated in ${elapsedTime.toFixed(2)}s\n\n`);
 
   const agentAnswer = result.conversation[result.conversation.length - 1];
-  console.log("Answer:", agentAnswer.content);
+  printAgentMessage("Answer: " + agentAnswer.content);
 
   baseMessages = [...result.conversation];
 }

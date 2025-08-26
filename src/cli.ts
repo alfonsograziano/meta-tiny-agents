@@ -1,6 +1,7 @@
 import { styleText } from "node:util";
 import readline from "readline";
 
+// Built with https://patorjk.com/software/taag/ using the "ANSI Shadow" font
 export const logo = `
 ████████╗██╗███╗   ██╗██╗   ██╗     █████╗  ██████╗ ███████╗███╗   ██╗████████╗
 ╚══██╔══╝██║████╗  ██║╚██╗ ██╔╝    ██╔══██╗██╔════╝ ██╔════╝████╗  ██║╚══██╔══╝
@@ -22,7 +23,11 @@ export const printUserMessage = (message: string) => {
 };
 
 export const printAgentMessage = (message: string) => {
-  console.log(styleText("red", message));
+  console.log(styleText("green", message));
+};
+
+export const printMcpMessage = (message: string) => {
+  console.log(styleText("yellow", message));
 };
 
 const rl = readline.createInterface({

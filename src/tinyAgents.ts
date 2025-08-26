@@ -6,8 +6,8 @@ import {
   getSystemPromptFromAgentResponse,
   PROMPT_DESIGNER_SYSTEM_PROMPT,
 } from "./prompts.ts";
-import { RAGQuery } from "./rag/index.js";
-import { printAgentMessage } from "./cli.ts";
+import { RAG } from "./rag/index.js";
+import { printMcpMessage } from "./cli.ts";
 
 /**
  * Represents a conversation message originating from a tool function call.
@@ -95,7 +95,7 @@ export class TinyAgent {
     ragResultsCount: number
   ): Promise<string> {
     try {
-      const ragQueryInstance = new RAGQuery();
+      const ragQueryInstance = new RAG();
       const results = await ragQueryInstance.query(ragQuery, ragResultsCount);
 
       if (results.length === 0) {
@@ -247,7 +247,7 @@ export class TinyAgent {
         const functionName = toolCall.function.name;
         const params = JSON.parse(toolCall.function.arguments || "{}");
 
-        printAgentMessage(`The agent is calling the tool ${functionName}`);
+        printMcpMessage(`The agent is calling the tool ${functionName}`);
 
         const toolStart = Date.now();
         let result = "";
@@ -268,7 +268,7 @@ export class TinyAgent {
         }
 
         const toolEnd = Date.now();
-        printAgentMessage(
+        printMcpMessage(
           `${functionName} completed in ${(
             (toolEnd - toolStart) /
             1000
