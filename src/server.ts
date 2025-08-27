@@ -1,14 +1,8 @@
 import { Server } from "socket.io";
 import { TinyAgent } from "./tinyAgents.js";
 import { OpenAI } from "openai";
-import { getContextString, getProfileDir, getWorkspaceDir } from "./utils.js";
-import {
-  getAvailableCommandsString,
-  printAgentMessage,
-  printLogo,
-  printSystemMessage,
-  promptUser,
-} from "./cli.ts";
+import { getProfileDir, getWorkspaceDir } from "./utils.js";
+import { printLogo, printSystemMessage } from "./cli.ts";
 import { agentConfig } from "./config.js";
 
 const PORT = 3000;
