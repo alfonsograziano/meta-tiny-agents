@@ -6,6 +6,7 @@ const configSchema = z.object({
   maxToolcallsPerInteraction: z.number(),
   model: z.string(),
   saveConversations: z.boolean().optional().default(false),
+  baseURL: z.string().optional(),
 });
 
 export const agentConfig = configSchema.parse(

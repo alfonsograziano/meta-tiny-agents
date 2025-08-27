@@ -11,6 +11,7 @@ const io = new Server(PORT);
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY!,
+  baseURL: agentConfig.baseURL,
 });
 
 const agent = new TinyAgent({
