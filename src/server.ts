@@ -4,6 +4,7 @@ import { OpenAI } from "openai";
 import { getProfileDir, getWorkspaceDir } from "./utils.js";
 import { printLogo, printSystemMessage } from "./cli.ts";
 import { agentConfig } from "./config.js";
+import { RAG } from "./rag/rag.ts";
 
 const PORT = 3000;
 const io = new Server(PORT);
@@ -96,6 +97,14 @@ const start = Date.now();
 await Promise.all(clients);
 const elapsedTime = (Date.now() - start) / 1000;
 printSystemMessage(`MCP clients initialized in ${elapsedTime.toFixed(2)}s\n\n`);
+
+printSystemMessage(`Syncing RAG in the background...`);
+
+const startRag = Date.now();
+const rag = new RAG();
+rag.sync().catch(console.error);
+
+printSystemMessage(`RAG synced in ${(Date.now() - startRag) / 1000}s\n\n`);
 
 printSystemMessage(
   `Server is running on port ${PORT}. You can now start client with "npm run start-client"`
