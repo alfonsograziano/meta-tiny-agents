@@ -1,62 +1,145 @@
-# Meta Tiny Agents
+# Tiny Agent
 
-A simple experimental framework for building LLM-based autonomous agents using OpenAI's tool use APIs and the Model Context Protocol (MCP). This project is a playground to explore multiple agentic patterns (ReAct, Plan-and-Execute, etc.) and see what's possible with minimal, hackable code.
+```
+████████╗██╗███╗   ██╗██╗   ██╗     █████╗  ██████╗ ███████╗███╗   ██╗████████╗
+╚══██╔══╝██║████╗  ██║╚██╗ ██╔╝    ██╔══██╗██╔════╝ ██╔════╝████╗  ██║╚══██╔══╝
+   ██║   ██║██╔██╗ ██║ ╚████╔╝     ███████║██║  ███╗█████╗  ██╔██╗ ██║   ██║
+   ██║   ██║██║╚██╗██║  ╚██╔╝      ██╔══██║██║   ██║██╔══╝  ██║╚██╗██║   ██║
+   ██║   ██║██║ ╚████║   ██║       ██║  ██║╚██████╔╝███████╗██║ ╚████║   ██║
+   ╚═╝   ╚═╝╚═╝  ╚═══╝   ╚═╝       ╚═╝  ╚═╝ ╚═════╝ ╚══════╝╚═╝  ╚═══╝   ╚═╝
+```
 
-## Getting Started
+A lightweight, intelligent agent framework with built-in RAG capabilities, memory persistence, and powerful tool integration. Tiny Agent combines a server-client architecture with automatic file indexing and PostgreSQL vector storage for seamless AI-powered workflows.
 
-### Install dependencies
+## Features
+
+- **🤖 Intelligent Agent**: LLM-powered agent with context-aware decision making
+- **🔄 Server-Client Architecture**: Separate server and client processes for scalable deployment
+- **📚 RAG System**: Automatic file indexing and retrieval with semantic search
+- **💾 Memory Persistence**: Save and load agent memories using RAG and pgvector
+- **🛠️ Built-in Tools**: Integrated MCP servers including code interpreter, Playwright, and filesystem access
+- **🔧 Node.js Sandbox**: Safe code execution environment for dynamic tool creation
+
+## Quick Start
+
+### Prerequisites
+
+- Node.js 18+
+- PostgreSQL with pgvector extension
+- OpenAI API key
+
+### Installation
 
 ```bash
 npm install
 ```
 
-Set your OpenAI API key:
+### Configuration
+
+1. Set your OpenAI API key:
 
 ```bash
 export OPENAI_API_KEY=your-key-here
 ```
 
-## Run the Agent
+2. Configure your agent in `agent.json`:
 
-This runs a sample agent goal with tool usage and user interaction:
+```json
+{
+  "name": "My Agent",
+  "model": "gpt-4",
+  "temperature": 0.7,
+  "maxTokens": 2000
+}
+```
+
+3. Set up your database connection in `docker-compose.yml` or environment variables
+
+### Running the Agent
+
+Start the server:
 
 ```bash
-npm start
+npm run start-server
 ```
 
-The agent will:
+Start the client:
 
-- Generate a system prompt using a Prompt Designer agent
-- Register and use tools (including MCP clients)
-- Ask follow-up questions if needed
-- Complete the task using LLM + tools
-
-## Register a Tool
-
-You can register a tool server using the MCP protocol:
-
-```ts
-await agent
-  .getClientsRegistry()
-  .register(
-    "stdio",
-    "hello-world",
-    "node",
-    ["./test/fixtures/helloWorldServer.js"],
-    { PATH: process.env.PATH }
-  );
+```bash
+npm run start-client
 ```
 
-## Example Goal
+## Architecture
 
-Inside `index.ts`:
+### Server
 
-```ts
-const goal = "Design a workout routine for a beginner with no equipment.";
-```
+The server handles:
 
-This gets passed to the Prompt Designer and used to generate the main agent's system prompt.
+- RAG operations and file indexing
+- Memory storage and retrieval
+- MCP server management
+- Tool registry and execution
 
----
+### Client
 
-This is not a production library. It's a space to learn, build, and iterate fast.
+The client provides:
+
+- User interaction interface
+- Goal setting and task management
+- Tool invocation and result handling
+- Memory context management
+
+## RAG System
+
+Tiny Agent automatically indexes files in your workspace and provides semantic search capabilities:
+
+- **Automatic Indexing**: Files are automatically processed and indexed
+- **Multiple Formats**: Supports PDF, text, and other document types
+- **Vector Search**: Uses pgvector for efficient similarity search
+- **Context Retrieval**: Relevant information is automatically retrieved for agent tasks
+
+## Memory System
+
+Persist agent memories across sessions:
+
+- **Memory Storage**: Save important information and context
+- **Vector Embeddings**: Memories are stored as semantic vectors
+- **Retrieval**: Automatically retrieve relevant memories for current tasks
+- **Persistence**: Memories survive server restarts and are stored in PostgreSQL
+
+## Built-in Tools
+
+### Code Interpreter
+
+- Execute Node.js code in a sandboxed environment
+- Safe code execution with resource limits
+- Dynamic tool creation capabilities
+
+### Playwright Integration
+
+- Web automation and scraping
+- Browser control and interaction
+- Screenshot and page analysis
+
+### Filesystem Access
+
+- File reading and writing
+- Directory traversal
+- File manipulation operations
+
+## Contributing
+
+This is an experimental framework for exploring AI agent patterns. Contributions are welcome!
+
+## License
+
+MIT License
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE
+OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
