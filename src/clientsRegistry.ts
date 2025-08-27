@@ -56,26 +56,26 @@ export class ClientsRegistry {
         },
       },
     },
-    {
-      clientName: INTERACTION_SERVER,
-      type: "function",
-      function: {
-        name: "ask_question",
-        description:
-          "Ask a question to the user to get more info required to solve or clarify their problem.",
-        parameters: {
-          type: "object",
-          properties: {
-            questions: {
-              type: "string",
-              description:
-                "The question(s) to ask the user to gather more information.",
-            },
-          },
-          required: ["questions"],
-        },
-      },
-    },
+    // {
+    //   clientName: INTERACTION_SERVER,
+    //   type: "function",
+    //   function: {
+    //     name: "ask_question",
+    //     description:
+    //       "Ask a question to the user to get more info required to solve or clarify their problem.",
+    //     parameters: {
+    //       type: "object",
+    //       properties: {
+    //         questions: {
+    //           type: "string",
+    //           description:
+    //             "The question(s) to ask the user to gather more information.",
+    //         },
+    //       },
+    //       required: ["questions"],
+    //     },
+    //   },
+    // },
   ];
 
   /**

@@ -1,4 +1,4 @@
-import { ClientsRegistry } from "./clientsRegistry.js";
+import { ClientsRegistry, type ToolCall } from "./clientsRegistry.js";
 import { OpenAI } from "openai";
 import {
   getRecipePrompt,
@@ -7,8 +7,16 @@ import {
   PROMPT_DESIGNER_SYSTEM_PROMPT,
 } from "./prompts.ts";
 import { RAG } from "./rag/index.js";
-import { printMcpMessage } from "./cli.ts";
 
+export type ToolCallResult = {
+  toolCallId: string;
+  toolName: string;
+  params: unknown;
+  result: unknown;
+  startTime: number;
+  endTime: number;
+  durationMs: number;
+};
 /**
  * Represents a conversation message originating from a tool function call.
  */
@@ -153,6 +161,8 @@ export class TinyAgent {
     ragResultsCount?: number;
     model: string;
     onStreamAnswer?: (content: string) => void;
+    onToolCall?: (toolCall: ToolCall) => void;
+    onToolCallResult?: (toolCallResult: ToolCallResult) => void;
   }): Promise<TinyAgentRunResult> {
     // Perform RAG retrieval if a query is provided
     let ragContext = "";
@@ -299,11 +309,12 @@ export class TinyAgent {
       // TODO: Make executions in parallel instead of sequentially
       // TODO: Create a tool, capable of spawning a new TinyAgent instance
       for (const toolCall of toolCallsRequested) {
+        if (options.onToolCall) {
+          options.onToolCall(toolCall);
+        }
         const toolCallId = toolCall.id;
         const functionName = toolCall.function.name;
         const params = JSON.parse(toolCall.function.arguments || "{}");
-
-        printMcpMessage(`The agent is calling the tool ${functionName}`);
 
         const toolStart = Date.now();
         let result = "";
@@ -324,12 +335,17 @@ export class TinyAgent {
         }
 
         const toolEnd = Date.now();
-        printMcpMessage(
-          `${functionName} completed in ${(
-            (toolEnd - toolStart) /
-            1000
-          ).toFixed(2)}s`
-        );
+        if (options.onToolCallResult) {
+          options.onToolCallResult({
+            toolCallId,
+            toolName: functionName,
+            params,
+            result,
+            startTime: toolStart,
+            endTime: toolEnd,
+            durationMs: toolEnd - toolStart,
+          });
+        }
 
         toolCalls.push({
           toolCallId,
