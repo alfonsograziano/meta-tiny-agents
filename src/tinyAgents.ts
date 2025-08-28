@@ -112,7 +112,7 @@ export class TinyAgent {
 
       const context = results
         .map((result, index) => {
-          return `[Document ${index + 1} - ${result.file}]\n${
+          return `[Document ${index + 1} - ${result.source}]\n${
             result.content
           }\n`;
         })
@@ -406,35 +406,6 @@ export class TinyAgent {
       throw new Error("The system prompt is empty.");
     }
     return getSystemPromptFromAgentResponse(systemPrompt as string);
-  }
-
-  public async generateRecipe(options: {
-    openai: OpenAI;
-    baseMessages: OpenAI.Chat.Completions.ChatCompletionMessageParam[];
-    ragQuery?: string;
-    ragResultsCount?: number;
-    model: string;
-  }): Promise<string> {
-    const conversation: ConversationMessage[] = [
-      ...options.baseMessages,
-      {
-        role: "user",
-        content: getRecipePrompt(),
-      },
-    ];
-
-    const result = await this.run({
-      openai: options.openai,
-      baseMessages: conversation,
-      ragQuery: options.ragQuery,
-      ragResultsCount: options.ragResultsCount,
-      model: options.model,
-    });
-    const lastMessage = result.conversation[result.conversation.length - 1];
-    if (lastMessage.role !== "assistant") {
-      throw new Error("Expected the last message to be from the assistant.");
-    }
-    return lastMessage.content as string;
   }
 
   /**
