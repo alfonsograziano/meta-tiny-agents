@@ -116,7 +116,8 @@ export class RAG {
 
     // Delete all existing data
     this.log("🗑️  Clearing all existing indexed data...");
-    await this.pool.query("DELETE FROM file_chunks");
+    await this.pool.query("DELETE FROM memory_chunks");
+    await this.pool.query("DELETE FROM memory");
     await this.pool.query("DELETE FROM files");
     this.log("✅ All existing data cleared");
 
@@ -127,17 +128,17 @@ export class RAG {
     // 1. Generate embedding
     const embedding = await this.embedText([query]);
 
-    // 2. Search DB
+    // 2. Search DB - now handles both file-based and memory-based chunks
     const res = await this.pool.query(
       `
       SELECT
-        file_chunks.id,
-        file_chunks.content,
-        files.path,
-        file_chunks.embedding <-> $1::vector AS distance
-      FROM file_chunks
-      JOIN files ON file_chunks.file_id = files.id
-      ORDER BY file_chunks.embedding <-> $1::vector
+        mc.id,
+        mc.content,
+        COALESCE(f.path, 'memory') as source,
+        mc.embedding <-> $1::vector AS distance
+      FROM memory_chunks mc
+      LEFT JOIN files f ON mc.file_id = f.id
+      ORDER BY mc.embedding <-> $1::vector
       LIMIT $2
     `,
       [`[${embedding.join(",")}]`, k]
@@ -145,21 +146,34 @@ export class RAG {
 
     return res.rows.map((row) => ({
       id: row.id,
-      file: row.path,
+      source: row.source,
       content: row.content,
       score: 1 - row.distance, // cosine similarity (closer to 1 = more similar)
     }));
   }
 
   public async indexText(data: string) {
-    // Under the hoods, this will create a new file in the /memory directory
-    const memoryDir = path.join(this.docsDir, "memory");
-    if (!fs.existsSync(memoryDir)) {
-      fs.mkdirSync(memoryDir);
+    // Create a new memory record instead of a file
+    const res = await this.pool.query(
+      "INSERT INTO memory (text, last_modified) VALUES ($1, $2) RETURNING id",
+      [data, new Date()]
+    );
+
+    const memoryId = res.rows[0].id;
+
+    // Chunk the text and create embeddings
+    const chunks = this.chunkText(data, this.CHUNK_SIZE);
+    const embeddings = await this.embedText(chunks);
+
+    // Insert chunks with memory_id instead of file_id
+    for (let i = 0; i < chunks.length; i++) {
+      await this.pool.query(
+        "INSERT INTO memory_chunks (memory_id, chunk_index, content, embedding) VALUES ($1, $2, $3, $4)",
+        [memoryId, i, chunks[i], `[${embeddings[i].join(",")}]`]
+      );
     }
-    const filePath = path.join(memoryDir, `${Date.now()}.txt`);
-    fs.writeFileSync(filePath, data);
-    await this.sync();
+
+    this.log(`Indexed text as memory with ${chunks.length} chunks`);
   }
 
   // ---------- PRIVATE HELPERS ----------
@@ -170,17 +184,29 @@ export class RAG {
         id SERIAL PRIMARY KEY,
         path TEXT UNIQUE NOT NULL,
         last_modified TIMESTAMP NOT NULL,
-        last_indexed TIMESTAMP NOT NULL
+        last_indexed TIMESTAMP NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
 
     await this.pool.query(`
-      CREATE TABLE IF NOT EXISTS file_chunks (
+      CREATE TABLE IF NOT EXISTS memory (
+        id SERIAL PRIMARY KEY,
+        text TEXT NOT NULL,
+        last_modified TIMESTAMP NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    await this.pool.query(`
+      CREATE TABLE IF NOT EXISTS memory_chunks (
         id SERIAL PRIMARY KEY,
         file_id INT REFERENCES files(id) ON DELETE CASCADE,
+        memory_id INT REFERENCES memory(id) ON DELETE CASCADE,
         chunk_index INT NOT NULL,
         content TEXT NOT NULL,
-        embedding VECTOR(1536)
+        embedding VECTOR(1536),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
   }
@@ -316,7 +342,7 @@ export class RAG {
       return existing.id;
     } else {
       const res = await this.pool.query(
-        "INSERT INTO files (path, last_modified, last_indexed) VALUES ($1, $2, $3) RETURNING id",
+        "INSERT INTO files (path, last_modified, last_indexed, created_at) VALUES ($1, $2, $3, CURRENT_TIMESTAMP) RETURNING id",
         [filePath, lastModified, new Date()]
       );
       return res.rows[0].id;
@@ -324,7 +350,7 @@ export class RAG {
   }
 
   private async clearFileChunks(fileId: number) {
-    await this.pool.query("DELETE FROM file_chunks WHERE file_id = $1", [
+    await this.pool.query("DELETE FROM memory_chunks WHERE file_id = $1", [
       fileId,
     ]);
   }
@@ -336,7 +362,7 @@ export class RAG {
   ) {
     for (let i = 0; i < chunks.length; i++) {
       await this.pool.query(
-        "INSERT INTO file_chunks (file_id, chunk_index, content, embedding) VALUES ($1, $2, $3, $4)",
+        "INSERT INTO memory_chunks (file_id, chunk_index, content, embedding) VALUES ($1, $2, $3, $4)",
         [fileId, i, chunks[i], `[${embeddings[i].join(",")}]`]
       );
     }
@@ -349,7 +375,7 @@ export class RAG {
 
   private async deleteFileRecord(fileId: number) {
     // Due to CASCADE constraint, deleting from files will automatically
-    // delete all related chunks from file_chunks table
+    // delete all related chunks from memory_chunks table
     await this.pool.query("DELETE FROM files WHERE id = $1", [fileId]);
   }
 
