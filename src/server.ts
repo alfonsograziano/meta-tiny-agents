@@ -5,6 +5,7 @@ import { getProfileDir, getWorkspaceDir } from "./utils.js";
 import { printLogo, printSystemMessage } from "./cli.ts";
 import { agentConfig } from "./config.js";
 import { RAG } from "./rag/rag.ts";
+import { getRecipePrompt } from "./prompts.ts";
 
 const PORT = 3000;
 const io = new Server(PORT);
@@ -156,6 +157,38 @@ io.on("connection", (socket) => {
       });
     }
   });
+
+  socket.on(
+    "generate-recipe",
+    async (
+      input: {
+        conversation: OpenAI.Chat.Completions.ChatCompletionMessageParam[];
+      },
+      callback
+    ) => {
+      const recipe = await agent.run({
+        openai,
+        baseMessages: [
+          {
+            role: "system",
+            content: getRecipePrompt(),
+          },
+          {
+            role: "user",
+            content:
+              "Generate the recipe for the task given the full conversation with the agent so far: " +
+              JSON.stringify(input, null, 2),
+          },
+        ],
+        model: agentConfig.model,
+      });
+      const recipeContent = recipe.conversation[recipe.conversation.length - 1]
+        .content as string;
+      await rag.indexText(recipeContent);
+
+      callback({ status: "ok", result: recipeContent });
+    }
+  );
 
   socket.on("disconnect", () => {
     console.log("Client disconnected:", socket.id);

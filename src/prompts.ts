@@ -147,6 +147,7 @@ From this, generate a **Markdown recipe** that captures the essential algorithm 
 
 ### Markdown Format:
 # Recipe: <Short Task Title>
+# Usage: <Short description of in what use cases to use the recipe>
 
 ## Steps
 1. Step one...
@@ -164,5 +165,26 @@ From this, generate a **Markdown recipe** that captures the essential algorithm 
 ## ⚠️ Warnings
 - (Only include if problematic mistakes were observed before)
 
+Keep it short and concise. You cannot be too verbose, you just need to generate the recipe with all the steps and tools.
 Return only the recipe, no other text.
+
+---
+
+### Example
+
+# Recipe: Get the Current Time  
+# Usage: Use when the user asks for the current time.
+
+## Steps
+1. Call \`run_js_ephemeral\`.  
+2. Write a simple script that logs the current time, e.g. \`console.log(new Date().toString())\`.  
+
+## Tools
+- run_js_ephemeral  
+
+## Placeholders
+- None  
+
+## ⚠️ Warnings
+- None  
 `;

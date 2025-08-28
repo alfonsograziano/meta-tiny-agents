@@ -8,10 +8,9 @@ import {
 } from "./cli.ts";
 import { io, Socket } from "socket.io-client";
 import { agentConfig } from "./config.ts";
-import { OpenAI } from "openai";
 import { getContextString } from "./utils.ts";
 import { type ToolCall } from "./clientsRegistry.ts";
-import type { ToolCallResult } from "./tinyAgents.ts";
+import type { ConversationMessage, ToolCallResult } from "./tinyAgents.ts";
 import { spawn } from "child_process";
 
 type SocketEventResult<T> = {
@@ -63,7 +62,7 @@ try {
   };
   const context = await getContextString();
 
-  let baseMessages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
+  let baseMessages: ConversationMessage[] = [
     { role: "system", content: agentConfig.systemPrompt },
     {
       role: "user",
@@ -78,12 +77,24 @@ try {
   });
 
   socket.on("tool-call", (toolCall: ToolCall) => {
+    baseMessages.push({
+      role: "tool",
+      content: JSON.stringify(toolCall),
+      tool_call_id: toolCall.id,
+      type: "function_call",
+    });
     printMcpMessage(
       `The agent is calling the tool ${toolCall.function.name}\n`
     );
   });
 
   socket.on("tool-call-result", (toolCallResult: ToolCallResult) => {
+    baseMessages.push({
+      role: "tool",
+      content: JSON.stringify(toolCallResult.result),
+      tool_call_id: toolCallResult.toolCallId,
+      type: "function_call_output",
+    });
     printMcpMessage(
       `${toolCallResult.toolName} completed in ${(
         toolCallResult.durationMs / 1000
@@ -124,6 +135,27 @@ try {
             clients.length
           } different clients: \n\n${clients.join(", ")}`
         );
+        continue;
+      }
+      if (command === "generate_recipe") {
+        const { input: continueGeneratingRecipe } = await promptUser(
+          "I will generate a recipe to accomplish the task givent the current conversation, do you want to continue? (y/n) ",
+          ">> "
+        );
+        if (continueGeneratingRecipe !== "y") {
+          continue;
+        }
+        printSystemMessage("Generating recipe...");
+        const { result: recipe } = await socketEmitPromisified<string>(
+          "generate-recipe",
+          baseMessages
+        );
+        printSystemMessage("Recipe generated:");
+        printAgentMessage(recipe);
+        continue;
+      }
+      if (command === "get_full_conversation") {
+        printSystemMessage(JSON.stringify(baseMessages, null, 2));
         continue;
       }
     } else {

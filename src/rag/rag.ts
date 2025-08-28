@@ -106,7 +106,6 @@ export class RAG {
       await this.insertChunks(fileId, chunks, embeddings);
     }
 
-    await this.pool.end();
     this.log("✅ Sync complete");
   }
 

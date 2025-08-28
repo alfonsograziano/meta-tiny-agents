@@ -77,6 +77,16 @@ export const commands = [
     name: "list_tools",
     description: "List all the available tools exposed through the MCP",
   },
+  {
+    name: "generate_recipe",
+    description:
+      "Generate a recipe for the task given the current conversation",
+  },
+  {
+    name: "get_full_conversation",
+    description:
+      "Get the full conversation with the agent so far in JSON format",
+  },
 ];
 
 export const availableCommands = commands.map((command) => command.name);

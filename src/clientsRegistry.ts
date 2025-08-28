@@ -32,6 +32,7 @@ export interface AvailableTool {
  * { function: { name: string; arguments?: string } }
  */
 export interface ToolCall {
+  id: string;
   function: {
     name: string;
     arguments?: string;

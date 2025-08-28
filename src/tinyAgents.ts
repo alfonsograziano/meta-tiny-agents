@@ -27,6 +27,13 @@ export interface ToolFunctionOutputMessage {
   role: "tool";
 }
 
+export interface ToolFunctionCallMessage {
+  type: "function_call";
+  tool_call_id: string;
+  content: string;
+  role: "tool";
+}
+
 /**
  * Union type for any message exchanged during the TinyAgent run:
  * - OpenAI.Chat.Completions.ChatCompletionMessageParam: messages sent to the LLM (system/user/function_call_output)
@@ -36,7 +43,8 @@ export interface ToolFunctionOutputMessage {
 export type ConversationMessage =
   | OpenAI.Chat.Completions.ChatCompletionMessageParam
   | OpenAI.Chat.Completions.ChatCompletionMessage
-  | ToolFunctionOutputMessage;
+  | ToolFunctionOutputMessage
+  | ToolFunctionCallMessage;
 
 /**
  * Telemetry for a single LLM invocation.
@@ -296,10 +304,7 @@ export class TinyAgent {
       conversation.push(responseMessage);
 
       const toolCallsRequested = responseMessage.tool_calls as
-        | Array<{
-            id: string;
-            function: { name: string; arguments: string };
-          }>
+        | Array<ToolCall>
         | undefined;
 
       if (!toolCallsRequested || toolCallsRequested.length === 0) {
