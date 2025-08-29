@@ -122,15 +122,20 @@ io.on("connection", (socket) => {
 
   socket.on("generate-answer", async (input, callback) => {
     let streamedContent = "";
+    let onStreamAnswer = undefined;
+
+    if (agentConfig.enableStreaming) {
+      onStreamAnswer = (chunk: string) => {
+        socket.emit("stream-answer", chunk);
+        streamedContent += chunk;
+      };
+    }
 
     const result = await agent.run({
       openai,
       baseMessages: input,
       model: agentConfig.model,
-      onStreamAnswer: (chunk: string) => {
-        socket.emit("stream-answer", chunk);
-        streamedContent += chunk;
-      },
+      onStreamAnswer,
       onToolCall: (toolCall) => {
         socket.emit("tool-call", toolCall);
       },

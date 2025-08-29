@@ -78,10 +78,18 @@ try {
 
   socket.on("tool-call", (toolCall: ToolCall) => {
     baseMessages.push({
-      role: "tool",
-      content: JSON.stringify(toolCall),
-      tool_call_id: toolCall.id,
-      type: "function_call",
+      role: "assistant",
+      content: null,
+      tool_calls: [
+        {
+          id: toolCall.id,
+          type: "function",
+          function: {
+            name: toolCall.function.name,
+            arguments: toolCall.function.arguments || "{}",
+          },
+        },
+      ],
     });
     printMcpMessage(
       `The agent is calling the tool ${toolCall.function.name}\n`
@@ -158,6 +166,15 @@ try {
         printSystemMessage(JSON.stringify(baseMessages, null, 2));
         continue;
       }
+      if (command === "start_browser") {
+        printSystemMessage("Starting browser...");
+        const child = spawn("npm", ["run", "start-browser"], {
+          stdio: "ignore",
+          detached: true,
+        });
+        child.unref();
+        continue;
+      }
     } else {
       baseMessages.push({ role: "user", content: input });
       printSystemMessage("Generating answer...");
@@ -171,14 +188,10 @@ try {
       const elapsedTime = (Date.now() - start) / 1000;
       if (!answer.streamed) {
         printAgentMessage(answer.content);
-        printSystemMessage(
-          `Answer generated in ${elapsedTime.toFixed(2)}s\n\n`
-        );
+        printSystemMessage(`Answer generated in ${elapsedTime.toFixed(2)}s`);
       } else {
         console.log("\n"); //Empty new line
-        printSystemMessage(
-          `Answer generated in ${elapsedTime.toFixed(2)}s\n\n`
-        );
+        printSystemMessage(`Answer generated in ${elapsedTime.toFixed(2)}s`);
       }
       baseMessages.push({ role: "assistant", content: answer.content });
     }

@@ -87,6 +87,11 @@ export const commands = [
     description:
       "Get the full conversation with the agent so far in JSON format",
   },
+  {
+    name: "start_browser",
+    description:
+      "Start the browser used by Playwright, useful to configure accounts",
+  },
 ];
 
 export const availableCommands = commands.map((command) => command.name);

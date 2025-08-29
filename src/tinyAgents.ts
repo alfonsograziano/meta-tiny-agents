@@ -1,7 +1,6 @@
 import { ClientsRegistry, type ToolCall } from "./clientsRegistry.js";
 import { OpenAI } from "openai";
 import {
-  getRecipePrompt,
   getSystemPromptDesigner,
   getSystemPromptFromAgentResponse,
   PROMPT_DESIGNER_SYSTEM_PROMPT,
@@ -43,8 +42,7 @@ export interface ToolFunctionCallMessage {
 export type ConversationMessage =
   | OpenAI.Chat.Completions.ChatCompletionMessageParam
   | OpenAI.Chat.Completions.ChatCompletionMessage
-  | ToolFunctionOutputMessage
-  | ToolFunctionCallMessage;
+  | ToolFunctionOutputMessage;
 
 /**
  * Telemetry for a single LLM invocation.
