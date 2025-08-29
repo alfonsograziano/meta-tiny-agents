@@ -5,11 +5,23 @@ const configSchema = z.object({
   systemPrompt: z.string(),
   maxToolcallsPerInteraction: z.number(),
   model: z.string(),
+  // Useful if you need to use a reasoning or powerful model as the main one
+  // But you want to keep a smaller model for things like chat title generation or
+  // other non-critical tasks
+  helperModel: z.string().optional(),
   saveConversations: z.boolean().optional().default(false),
   baseURL: z.string().optional(),
   enableStreaming: z.boolean().optional().default(false),
+  // Whether to perform RAG queries at each interaction
+  performRAGQueries: z.boolean().optional().default(false),
 });
 
-export const agentConfig = configSchema.parse(
+const partialAgentConfig = configSchema.parse(
   JSON.parse(fs.readFileSync("agent.json", "utf8"))
 );
+
+export const agentConfig = {
+  ...partialAgentConfig,
+  // Helper model defaults to the same model as the main model if not specified
+  helperModel: partialAgentConfig.helperModel ?? partialAgentConfig.model,
+};

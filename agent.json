@@ -2,6 +2,8 @@
   "systemPrompt": "You are a helpful assistant",
   "maxToolcallsPerInteraction": 10,
   "model": "gpt-4o-mini",
+  "helperModel": "gpt-4o-mini",
   "saveConversations": true,
-  "enableStreaming": true
+  "enableStreaming": true,
+  "performRAGQueries": true
 }

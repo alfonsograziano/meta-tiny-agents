@@ -120,48 +120,62 @@ io.on("connection", (socket) => {
     callback({ status: "ok", result: tools });
   });
 
-  socket.on("generate-answer", async (input, callback) => {
-    let streamedContent = "";
-    let onStreamAnswer = undefined;
-
-    if (agentConfig.enableStreaming) {
-      onStreamAnswer = (chunk: string) => {
-        socket.emit("stream-answer", chunk);
-        streamedContent += chunk;
-      };
-    }
-
-    const result = await agent.run({
-      openai,
-      baseMessages: input,
-      model: agentConfig.model,
-      onStreamAnswer,
-      onToolCall: (toolCall) => {
-        socket.emit("tool-call", toolCall);
+  socket.on(
+    "generate-answer",
+    async (
+      input: {
+        messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[];
+        ragQueries: string[];
       },
-      onToolCallResult: (toolCallResult) => {
-        socket.emit("tool-call-result", toolCallResult);
-      },
-    });
+      callback
+    ) => {
+      let streamedContent = "";
+      let onStreamAnswer = undefined;
 
-    if (!streamedContent) {
-      callback({
-        status: "ok",
-        result: {
-          content: result.conversation[result.conversation.length - 1].content,
-          streamed: false,
+      if (agentConfig.enableStreaming) {
+        onStreamAnswer = (chunk: string) => {
+          socket.emit("stream-answer", chunk);
+          streamedContent += chunk;
+        };
+      }
+
+      console.log("ragQueries on the server", input.ragQueries);
+
+      const result = await agent.run({
+        openai,
+        baseMessages: input.messages,
+        ragQueries: input.ragQueries,
+        model: agentConfig.model,
+        onStreamAnswer,
+        onToolCall: (toolCall) => {
+          socket.emit("tool-call", toolCall);
+        },
+        onToolCallResult: (toolCallResult) => {
+          socket.emit("tool-call-result", toolCallResult);
         },
       });
-    } else {
-      callback({
-        status: "ok",
-        result: {
-          content: result.conversation[result.conversation.length - 1].content,
-          streamed: true,
-        },
-      });
+
+      if (!streamedContent) {
+        callback({
+          status: "ok",
+          result: {
+            content:
+              result.conversation[result.conversation.length - 1].content,
+            streamed: false,
+          },
+        });
+      } else {
+        callback({
+          status: "ok",
+          result: {
+            content:
+              result.conversation[result.conversation.length - 1].content,
+            streamed: true,
+          },
+        });
+      }
     }
-  });
+  );
 
   socket.on(
     "generate-recipe",
@@ -192,6 +206,22 @@ io.on("connection", (socket) => {
       await rag.indexText(recipeContent);
 
       callback({ status: "ok", result: recipeContent });
+    }
+  );
+
+  socket.on(
+    "generate-rag-queries",
+    async (
+      input: OpenAI.Chat.Completions.ChatCompletionMessageParam[],
+      callback
+    ) => {
+      const queries = await agent.generateRAGQueries({
+        openai,
+        messages: input,
+        model: agentConfig.helperModel,
+      });
+
+      callback({ status: "ok", result: queries });
     }
   );
 

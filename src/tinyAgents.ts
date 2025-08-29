@@ -3,8 +3,11 @@ import { OpenAI } from "openai";
 import {
   getSystemPromptDesigner,
   getSystemPromptFromAgentResponse,
+  getRAGQueriesPrompt,
   PROMPT_DESIGNER_SYSTEM_PROMPT,
 } from "./prompts.ts";
+import { zodResponseFormat } from "openai/helpers/zod";
+import { z } from "zod";
 import { RAG } from "./rag/index.js";
 
 export type ToolCallResult = {
@@ -105,27 +108,31 @@ export class TinyAgent {
    * @returns Promise<string> The formatted RAG context or empty string if RAG is disabled
    */
   private async performRAGRetrieval(
-    ragQuery: string,
+    ragQueries: string[],
     ragResultsCount: number
   ): Promise<string> {
     try {
       const ragQueryInstance = new RAG();
-      const results = await ragQueryInstance.query(ragQuery, ragResultsCount);
+
+      const results = await Promise.all(
+        ragQueries.map((ragQuery) =>
+          ragQueryInstance.query(ragQuery, ragResultsCount)
+        )
+      );
 
       if (results.length === 0) {
         return "";
       }
 
       const context = results
-        .map((result, index) => {
-          return `[Document ${index + 1} - ${result.source}]\n${
-            result.content
-          }\n`;
+        .flat()
+        .map((result) => {
+          return `[${result.source}]\n${result.content}\n`;
         })
         .join("\n");
 
       const ragContext = `\n--- RELEVANT CONTEXT FROM KNOWLEDGE BASE ---\n${context}\n--- END CONTEXT ---\n\nBased on the above context, please proceed with the user's request.`;
-
+      console.log("ragContext in performRAGRetrieval", ragContext);
       return ragContext;
     } catch (error) {
       return "";
@@ -163,7 +170,7 @@ export class TinyAgent {
     requestInputFromUser?: (question: string) => Promise<{
       input: string;
     }>;
-    ragQuery?: string;
+    ragQueries?: string[];
     ragResultsCount?: number;
     model: string;
     onStreamAnswer?: (content: string) => void;
@@ -172,12 +179,13 @@ export class TinyAgent {
   }): Promise<TinyAgentRunResult> {
     // Perform RAG retrieval if a query is provided
     let ragContext = "";
-    if (options.ragQuery) {
+    if (options.ragQueries && options.ragQueries.length > 0) {
       const ragResultsCount = options.ragResultsCount ?? 5;
       ragContext = await this.performRAGRetrieval(
-        options.ragQuery,
+        options.ragQueries,
         ragResultsCount
       );
+      console.log("ragContext", ragContext);
     }
 
     // Add RAG context to base messages if available
@@ -200,6 +208,11 @@ export class TinyAgent {
         });
       }
     }
+
+    console.log(
+      "enhancedBaseMessages",
+      JSON.stringify(enhancedBaseMessages, null, 2)
+    );
 
     const mcpTools = await this.registry.getTools();
     // Map MCP tools into OpenAI's ChatCompletionTool format
@@ -396,7 +409,7 @@ export class TinyAgent {
           content: getSystemPromptDesigner(options.goal),
         },
       ],
-      ragQuery: options.ragQuery,
+      ragQueries: options.ragQuery ? [options.ragQuery] : [],
       ragResultsCount: options.ragResultsCount,
       model: options.model,
     });
@@ -409,6 +422,42 @@ export class TinyAgent {
       throw new Error("The system prompt is empty.");
     }
     return getSystemPromptFromAgentResponse(systemPrompt as string);
+  }
+
+  public async generateRAGQueries(options: {
+    openai: OpenAI;
+    messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[];
+    model: string;
+  }): Promise<string[]> {
+    const { openai, messages, model } = options;
+
+    const RAGQueriesSchema = z.object({
+      queries: z.array(z.string()),
+    });
+
+    try {
+      const completion = await openai.chat.completions.parse({
+        model,
+        messages: [
+          {
+            role: "system",
+            content: getRAGQueriesPrompt(),
+          },
+          ...messages,
+        ],
+        response_format: zodResponseFormat(RAGQueriesSchema, "queries"),
+      });
+
+      const queries = completion.choices[0]?.message?.parsed;
+      if (!queries) {
+        return [];
+      }
+
+      return queries.queries;
+    } catch (error) {
+      console.error("Error generating RAG queries:", error);
+      return [];
+    }
   }
 
   /**

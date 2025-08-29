@@ -188,3 +188,15 @@ Return only the recipe, no other text.
 ## ⚠️ Warnings
 - None  
 `;
+
+export const getRAGQueriesPrompt = () => `
+You are an AI agent designed to generate search questions for a Retrieval-Augmented Generation (RAG) system.
+
+Task: Transform the user request into an array of questions that a retrieval system could use to fetch the most relevant information.
+
+Query generation:
+- Return 0–5 standalone, specific queries (no pronouns). Include entities, disambiguators, and time bounds if relevant.
+- ≤200 characters each. No prose, no explanations.
+
+Language: match user_request. Do not include any text outside the JSON.
+`;

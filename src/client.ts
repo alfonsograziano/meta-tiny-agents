@@ -180,10 +180,26 @@ try {
       printSystemMessage("Generating answer...");
       const start = Date.now();
 
+      let ragQueries: string[] = [];
+      if (agentConfig.performRAGQueries) {
+        printSystemMessage("Generating RAG queries...");
+        const result = await socketEmitPromisified<string[]>(
+          "generate-rag-queries",
+          baseMessages
+        );
+        ragQueries = result.result;
+        printSystemMessage("RAG queries generated. Building your answer...");
+      }
+
+      console.log("ragQueries on the client", ragQueries);
+
       const { result: answer } = await socketEmitPromisified<{
         content: string;
         streamed: boolean;
-      }>("generate-answer", baseMessages);
+      }>("generate-answer", {
+        messages: baseMessages,
+        ragQueries,
+      });
 
       const elapsedTime = (Date.now() - start) / 1000;
       if (!answer.streamed) {
