@@ -1,7 +1,14 @@
 "use client";
 
 import React, { createContext, useContext, useReducer, ReactNode } from "react";
-import { ConversationMessage, ToolCall, ToolCallResult, Tool } from "../types";
+import {
+  ConversationMessage,
+  ToolCall,
+  ToolCallResult,
+  Tool,
+  ToolCallEvent,
+  ToolCallResultEvent,
+} from "../types";
 
 interface ChatState {
   messages: ConversationMessage[];
@@ -9,6 +16,8 @@ interface ChatState {
   currentStreamedMessage: string;
   tools: Tool[];
   showTools: boolean;
+  toolCallEvents: ToolCallEvent[];
+  toolResultEvents: ToolCallResultEvent[];
 }
 
 type ChatAction =
@@ -16,6 +25,8 @@ type ChatAction =
   | { type: "ADD_ASSISTANT_MESSAGE"; content: string }
   | { type: "ADD_TOOL_CALL"; toolCall: ToolCall }
   | { type: "ADD_TOOL_RESULT"; toolResult: ToolCallResult }
+  | { type: "ADD_TOOL_CALL_EVENT"; toolCallEvent: ToolCallEvent }
+  | { type: "ADD_TOOL_RESULT_EVENT"; toolResultEvent: ToolCallResultEvent }
   | { type: "SET_STREAMED_MESSAGE"; content: string }
   | { type: "CLEAR_STREAMED_MESSAGE" }
   | { type: "SET_GENERATING"; isGenerating: boolean }
@@ -30,6 +41,8 @@ const initialState: ChatState = {
   currentStreamedMessage: "",
   tools: [],
   showTools: false,
+  toolCallEvents: [],
+  toolResultEvents: [],
 };
 
 function chatReducer(state: ChatState, action: ChatAction): ChatState {
@@ -89,6 +102,18 @@ function chatReducer(state: ChatState, action: ChatAction): ChatState {
         ],
       };
 
+    case "ADD_TOOL_CALL_EVENT":
+      return {
+        ...state,
+        toolCallEvents: [...state.toolCallEvents, action.toolCallEvent],
+      };
+
+    case "ADD_TOOL_RESULT_EVENT":
+      return {
+        ...state,
+        toolResultEvents: [...state.toolResultEvents, action.toolResultEvent],
+      };
+
     case "SET_STREAMED_MESSAGE":
       return {
         ...state,
@@ -124,6 +149,8 @@ function chatReducer(state: ChatState, action: ChatAction): ChatState {
         ...state,
         messages: [],
         currentStreamedMessage: "",
+        toolCallEvents: [],
+        toolResultEvents: [],
       };
 
     case "SET_SYSTEM_MESSAGE":
@@ -144,6 +171,8 @@ interface ChatContextType {
   addAssistantMessage: (content: string) => void;
   addToolCall: (toolCall: ToolCall) => void;
   addToolResult: (toolResult: ToolCallResult) => void;
+  addToolCallEvent: (toolCallEvent: ToolCallEvent) => void;
+  addToolResultEvent: (toolResultEvent: ToolCallResultEvent) => void;
   setStreamedMessage: (content: string) => void;
   clearStreamedMessage: () => void;
   setGenerating: (isGenerating: boolean) => void;
@@ -173,6 +202,14 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
   const addToolResult = (toolResult: ToolCallResult) => {
     dispatch({ type: "ADD_TOOL_RESULT", toolResult });
+  };
+
+  const addToolCallEvent = (toolCallEvent: ToolCallEvent) => {
+    dispatch({ type: "ADD_TOOL_CALL_EVENT", toolCallEvent });
+  };
+
+  const addToolResultEvent = (toolResultEvent: ToolCallResultEvent) => {
+    dispatch({ type: "ADD_TOOL_RESULT_EVENT", toolResultEvent });
   };
 
   const setStreamedMessage = (content: string) => {
@@ -210,6 +247,8 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     addAssistantMessage,
     addToolCall,
     addToolResult,
+    addToolCallEvent,
+    addToolResultEvent,
     setStreamedMessage,
     clearStreamedMessage,
     setGenerating,

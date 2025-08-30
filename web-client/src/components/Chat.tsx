@@ -6,8 +6,14 @@ import { ChatInput } from "./ChatInput";
 import { Sidebar } from "./Sidebar";
 import { useSocket } from "../hooks/useSocket";
 import { useChat } from "../contexts/ChatContext";
-import { ToolCall, ToolCallResult } from "../types";
+import {
+  ToolCall,
+  ToolCallResult,
+  ToolCallEvent,
+  ToolCallResultEvent,
+} from "../types";
 import { Bot, AlertCircle, CheckCircle, Loader2 } from "lucide-react";
+import { ToolAccordion } from "./ToolAccordion";
 
 export function Chat() {
   const {
@@ -47,7 +53,12 @@ export function Chat() {
 
   useEffect(() => {
     scrollToBottom();
-  }, [state.messages, state.currentStreamedMessage]);
+  }, [
+    state.messages,
+    state.currentStreamedMessage,
+    state.toolCallEvents,
+    state.toolResultEvents,
+  ]);
 
   // Socket event listeners
   useEffect(() => {
@@ -274,8 +285,8 @@ export function Chat() {
 
   return (
     <div className="flex flex-col h-screen bg-gray-900">
-      {/* Top Navbar */}
-      <div className="bg-gray-800 border-b border-gray-700 p-4">
+      {/* Top Navbar - Fixed */}
+      <div className="bg-gray-800 border-b border-gray-700 p-4 flex-shrink-0">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Bot className="w-8 h-8 text-blue-400" />
@@ -296,8 +307,8 @@ export function Chat() {
         </div>
       </div>
 
-      {/* Main Content Area */}
-      <div className="flex flex-1">
+      {/* Main Content Area - Flex container */}
+      <div className="flex flex-1 min-h-0">
         <Sidebar
           isOpen={sidebarOpen}
           onToggle={() => setSidebarOpen(!sidebarOpen)}
@@ -308,10 +319,12 @@ export function Chat() {
         />
 
         <div className="flex-1 flex justify-center">
-          <div className="w-full max-w-4xl flex flex-col">
-            {/* Messages */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-4">
-              {state.messages.length === 0 ? (
+          <div className="w-full max-w-4xl flex flex-col min-h-0">
+            {/* Messages Container - Scrollable */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-4 min-h-0">
+              {state.messages.length === 0 &&
+              state.toolCallEvents.length === 0 &&
+              state.toolResultEvents.length === 0 ? (
                 <div className="text-center text-gray-400 mt-20">
                   <Bot className="w-16 h-16 mx-auto mb-4 text-gray-600" />
                   <h2 className="text-xl font-semibold mb-2">
@@ -321,6 +334,34 @@ export function Chat() {
                 </div>
               ) : (
                 <>
+                  {/* Tool Call Events - Show when tools are being called */}
+                  {state.toolCallEvents.map((toolCallEvent, index) => (
+                    <ToolAccordion
+                      key={`tool-call-${index}`}
+                      toolName={toolCallEvent.function.name}
+                      toolCallId={toolCallEvent.id}
+                      arguments={toolCallEvent.function.arguments}
+                      type="call"
+                    />
+                  ))}
+
+                  {/* Tool Result Events - Show when tools complete */}
+                  {state.toolResultEvents.map((toolResultEvent, index) => (
+                    <ToolAccordion
+                      key={`tool-result-${index}`}
+                      toolName={toolResultEvent.toolName}
+                      toolCallId={toolResultEvent.toolCallId}
+                      arguments=""
+                      type="result"
+                      durationMs={toolResultEvent.durationMs}
+                      result={toolResultEvent.result}
+                      params={toolResultEvent.params}
+                      startTime={toolResultEvent.startTime}
+                      endTime={toolResultEvent.endTime}
+                    />
+                  ))}
+
+                  {/* Regular Messages */}
                   {state.messages.map((message, index) => (
                     <Message key={index} message={message} />
                   ))}
@@ -375,17 +416,21 @@ export function Chat() {
               <div ref={messagesEndRef} />
             </div>
 
-            {/* Input */}
-            <ChatInput
-              onSendMessage={handleSendMessage}
-              onCommand={handleCommand}
-              disabled={!isConnected || state.isGenerating}
-              placeholder={
-                state.isGenerating ? "Generating answer..." : "Ask anything..."
-              }
-              ragEnabled={ragEnabled}
-              onToggleRAG={() => setRagEnabled(!ragEnabled)}
-            />
+            {/* Input - Fixed at bottom */}
+            <div className="flex-shrink-0">
+              <ChatInput
+                onSendMessage={handleSendMessage}
+                onCommand={handleCommand}
+                disabled={!isConnected || state.isGenerating}
+                placeholder={
+                  state.isGenerating
+                    ? "Generating answer..."
+                    : "Ask anything..."
+                }
+                ragEnabled={ragEnabled}
+                onToggleRAG={() => setRagEnabled(!ragEnabled)}
+              />
+            </div>
           </div>
         </div>
       </div>

@@ -22,6 +22,25 @@ export interface ToolCallResult {
   durationMs: number;
 }
 
+// Types for tool call events from the backend
+export interface ToolCallEvent {
+  id: string;
+  function: {
+    name: string;
+    arguments: string;
+  };
+}
+
+export interface ToolCallResultEvent {
+  toolCallId: string;
+  toolName: string;
+  params: unknown;
+  result: unknown;
+  startTime: number;
+  endTime: number;
+  durationMs: number;
+}
+
 export interface SocketEventResult<T> {
   status: string;
   result: T;
