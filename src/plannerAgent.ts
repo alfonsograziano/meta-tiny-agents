@@ -23,7 +23,10 @@ type SocketEventResult<T> = {
 };
 
 printLogo();
-printSystemMessage("Welcome in Tiny Agent client...");
+printSystemMessage("Welcome in Tiny Agent client in planner mode...");
+
+// This planner mode has been heavily inspired by: https://docs.google.com/document/d/1flxKGrbnF2g8yh3F-oVD5Xx7ZumId56HbFpIiPdkqLI/edit?tab=t.0#heading=h.fxiksssjx6aj
+// If you want to learn more: https://www.promptingguide.ai/techniques/prompt_chaining
 
 async function connectToServer(url: string, opts: any = {}): Promise<Socket> {
   return new Promise((resolve, reject) => {
