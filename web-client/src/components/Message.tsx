@@ -8,12 +8,14 @@ interface MessageProps {
   message: ConversationMessage;
   isStreaming?: boolean;
   isGenerating?: boolean;
+  isGeneratingRAG?: boolean;
 }
 
 export function Message({
   message,
   isStreaming = false,
   isGenerating = false,
+  isGeneratingRAG = false,
 }: MessageProps) {
   const getMessageIcon = () => {
     switch (message.role) {
@@ -66,7 +68,11 @@ export function Message({
       return (
         <div className="flex items-center gap-2 text-gray-300">
           <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin"></div>
-          <span>Generating...</span>
+          <span>
+            {isGeneratingRAG
+              ? "Searching for relevant information..."
+              : "Generating your answer..."}
+          </span>
         </div>
       );
     }

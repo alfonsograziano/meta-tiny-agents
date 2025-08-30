@@ -16,6 +16,7 @@ export function Chat() {
     isConnecting,
     error,
     listTools,
+    generateRagQueries,
     generateAnswer,
     generateRecipe,
   } = useSocket();
@@ -35,6 +36,8 @@ export function Chat() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [showFullConversation, setShowFullConversation] = useState(false);
   const [streamingContent, setStreamingContent] = useState("");
+  const [ragEnabled, setRagEnabled] = useState(false);
+  const [isGeneratingRAG, setIsGeneratingRAG] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll to bottom
@@ -111,7 +114,7 @@ export function Chat() {
     }
   }, [state.isGenerating, setGenerating]);
 
-  // When generating stops, ensure streaming content is added to conversation
+  // Handle streaming completion - add streaming content to conversation when generating stops
   useEffect(() => {
     if (!state.isGenerating && streamingContent) {
       // Add the streaming content to the conversation when generating stops
@@ -129,14 +132,31 @@ export function Chat() {
     setStreamingContent("");
 
     try {
+      // Generate RAG queries if enabled
+      let ragQueries: string[] = [];
+      if (ragEnabled) {
+        setIsGeneratingRAG(true);
+        try {
+          ragQueries = await generateRagQueries([
+            ...state.messages,
+            { role: "user", content: message },
+          ]);
+          console.log("Generated RAG queries:", ragQueries);
+        } catch (err) {
+          console.error("RAG query generation failed:", err);
+        } finally {
+          setIsGeneratingRAG(false);
+        }
+      }
+
       // Generate answer - this should trigger streaming
-      const response = await generateAnswer({
+      await generateAnswer({
         messages: [...state.messages, { role: "user", content: message }],
-        ragQueries: [],
+        ragQueries,
       });
 
-      // Always stop generating after getting a response
-      // The streaming will be handled by socket events
+      // The response will be handled by socket streaming events
+      // We just need to stop the generating state
       setGenerating(false);
     } catch (err) {
       console.error("Failed to generate answer:", err);
@@ -253,17 +273,8 @@ export function Chat() {
   };
 
   return (
-    <div className="flex h-screen bg-gray-900">
-      <Sidebar
-        isOpen={sidebarOpen}
-        onToggle={() => setSidebarOpen(!sidebarOpen)}
-        tools={state.tools}
-        onCommand={handleCommand}
-        onClearConversation={handleClearConversation}
-        messageCount={state.messages.length}
-      />
-
-      {/* Header - Full width */}
+    <div className="flex flex-col h-screen bg-gray-900">
+      {/* Top Navbar */}
       <div className="bg-gray-800 border-b border-gray-700 p-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -275,87 +286,107 @@ export function Chat() {
           </div>
 
           <div className="flex items-center gap-2 text-sm text-gray-400">
-            {/* RAG generation indicator removed */}
+            {isGeneratingRAG && (
+              <div className="flex items-center gap-2">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span>Searching for relevant information...</span>
+              </div>
+            )}
           </div>
         </div>
       </div>
 
-      <div className="flex-1 flex justify-center">
-        <div className="w-full max-w-4xl flex flex-col">
-          {/* Messages */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-4">
-            {state.messages.length === 0 ? (
-              <div className="text-center text-gray-400 mt-20">
-                <Bot className="w-16 h-16 mx-auto mb-4 text-gray-600" />
-                <h2 className="text-xl font-semibold mb-2">
-                  Welcome to Tiny Agents
-                </h2>
-                <p>Start a conversation by typing a message below.</p>
-              </div>
-            ) : (
-              <>
-                {state.messages.map((message, index) => (
-                  <Message key={index} message={message} />
-                ))}
+      {/* Main Content Area */}
+      <div className="flex flex-1">
+        <Sidebar
+          isOpen={sidebarOpen}
+          onToggle={() => setSidebarOpen(!sidebarOpen)}
+          tools={state.tools}
+          onCommand={handleCommand}
+          onClearConversation={handleClearConversation}
+          messageCount={state.messages.length}
+        />
 
-                {/* Generating indicator - show while generating but before streaming starts */}
-                {state.isGenerating && !streamingContent && (
-                  <Message
-                    message={{
-                      role: "assistant",
-                      content: "",
-                    }}
-                    isGenerating={true}
-                  />
-                )}
-
-                {/* Streaming message - only show when actively streaming and not yet added to conversation */}
-                {streamingContent && state.isGenerating && (
-                  <Message
-                    message={{
-                      role: "assistant",
-                      content: streamingContent,
-                    }}
-                    isStreaming={true}
-                  />
-                )}
-              </>
-            )}
-
-            {/* Full conversation modal */}
-            {showFullConversation && (
-              <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-                <div className="bg-gray-800 rounded-lg p-6 max-w-4xl max-h-[80vh] overflow-y-auto">
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-semibold text-white">
-                      Full Conversation
-                    </h3>
-                    <button
-                      onClick={() => setShowFullConversation(false)}
-                      className="text-gray-400 hover:text-white"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                  <pre className="text-sm text-gray-300 whitespace-pre-wrap">
-                    {JSON.stringify(state.messages, null, 2)}
-                  </pre>
+        <div className="flex-1 flex justify-center">
+          <div className="w-full max-w-4xl flex flex-col">
+            {/* Messages */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+              {state.messages.length === 0 ? (
+                <div className="text-center text-gray-400 mt-20">
+                  <Bot className="w-16 h-16 mx-auto mb-4 text-gray-600" />
+                  <h2 className="text-xl font-semibold mb-2">
+                    Welcome to Tiny Agents
+                  </h2>
+                  <p>Start a conversation by typing a message below.</p>
                 </div>
-              </div>
-            )}
+              ) : (
+                <>
+                  {state.messages.map((message, index) => (
+                    <Message key={index} message={message} />
+                  ))}
 
-            <div ref={messagesEndRef} />
+                  {/* Generating indicator - show while generating but before streaming starts */}
+                  {state.isGenerating && !streamingContent && (
+                    <Message
+                      message={{
+                        role: "assistant",
+                        content: "",
+                      }}
+                      isGenerating={true}
+                      isGeneratingRAG={isGeneratingRAG}
+                    />
+                  )}
+
+                  {/* Streaming message - only show when actively streaming and not yet added to conversation */}
+                  {streamingContent && state.isGenerating && (
+                    <Message
+                      message={{
+                        role: "assistant",
+                        content: streamingContent,
+                      }}
+                      isStreaming={true}
+                    />
+                  )}
+                </>
+              )}
+
+              {/* Full conversation modal */}
+              {showFullConversation && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+                  <div className="bg-gray-800 rounded-lg p-6 max-w-4xl max-h-[80vh] overflow-y-auto">
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-lg font-semibold text-white">
+                        Full Conversation
+                      </h3>
+                      <button
+                        onClick={() => setShowFullConversation(false)}
+                        className="text-gray-400 hover:text-white"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                    <pre className="text-sm text-gray-300 whitespace-pre-wrap">
+                      {JSON.stringify(state.messages, null, 2)}
+                    </pre>
+                  </div>
+                </div>
+              )}
+
+              <div ref={messagesEndRef} />
+            </div>
+
+            {/* Input */}
+            <ChatInput
+              onSendMessage={handleSendMessage}
+              onCommand={handleCommand}
+              disabled={!isConnected || state.isGenerating}
+              placeholder={
+                state.isGenerating ? "Generating answer..." : "Ask anything..."
+              }
+              ragEnabled={ragEnabled}
+              onToggleRAG={() => setRagEnabled(!ragEnabled)}
+            />
           </div>
-
-          {/* Input */}
-          <ChatInput
-            onSendMessage={handleSendMessage}
-            onCommand={handleCommand}
-            disabled={!isConnected || state.isGenerating}
-            placeholder={
-              state.isGenerating ? "Generating answer..." : "Ask anything..."
-            }
-          />
         </div>
       </div>
     </div>

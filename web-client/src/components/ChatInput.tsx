@@ -8,6 +8,8 @@ interface ChatInputProps {
   onCommand: (command: string) => void;
   disabled?: boolean;
   placeholder?: string;
+  ragEnabled: boolean;
+  onToggleRAG: () => void;
 }
 
 export function ChatInput({
@@ -15,6 +17,8 @@ export function ChatInput({
   onCommand,
   disabled = false,
   placeholder = "Ask anything...",
+  ragEnabled = false,
+  onToggleRAG,
 }: ChatInputProps) {
   const [input, setInput] = useState("");
   const [isCommandMode, setIsCommandMode] = useState(false);
@@ -87,6 +91,26 @@ export function ChatInput({
             {isCommandMode && (
               <span className="text-xs text-blue-400 bg-blue-900/30 px-2 py-1 rounded">
                 Command Mode
+              </span>
+            )}
+
+            <button
+              type="button"
+              onClick={onToggleRAG}
+              className={`p-1 rounded transition-colors ${
+                ragEnabled
+                  ? "bg-green-600 text-white"
+                  : "text-gray-400 hover:text-gray-300 hover:bg-gray-700"
+              }`}
+              title="Toggle enhanced search for better answers"
+            >
+              <span className="text-xs font-medium">
+                Get relevant info from memory
+              </span>
+            </button>
+            {ragEnabled && (
+              <span className="text-xs text-green-400 bg-green-900/30 px-2 py-1 rounded">
+                Enhanced Search
               </span>
             )}
           </div>
