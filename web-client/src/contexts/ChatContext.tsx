@@ -6,7 +6,6 @@ import { ConversationMessage, ToolCall, ToolCallResult, Tool } from "../types";
 interface ChatState {
   messages: ConversationMessage[];
   isGenerating: boolean;
-  isGeneratingRAG: boolean;
   currentStreamedMessage: string;
   tools: Tool[];
   showTools: boolean;
@@ -20,7 +19,6 @@ type ChatAction =
   | { type: "SET_STREAMED_MESSAGE"; content: string }
   | { type: "CLEAR_STREAMED_MESSAGE" }
   | { type: "SET_GENERATING"; isGenerating: boolean }
-  | { type: "SET_GENERATING_RAG"; isGeneratingRAG: boolean }
   | { type: "SET_TOOLS"; tools: Tool[] }
   | { type: "TOGGLE_TOOLS" }
   | { type: "CLEAR_CONVERSATION" }
@@ -29,7 +27,6 @@ type ChatAction =
 const initialState: ChatState = {
   messages: [],
   isGenerating: false,
-  isGeneratingRAG: false,
   currentStreamedMessage: "",
   tools: [],
   showTools: false,
@@ -110,12 +107,6 @@ function chatReducer(state: ChatState, action: ChatAction): ChatState {
         isGenerating: action.isGenerating,
       };
 
-    case "SET_GENERATING_RAG":
-      return {
-        ...state,
-        isGeneratingRAG: action.isGeneratingRAG,
-      };
-
     case "SET_TOOLS":
       return {
         ...state,
@@ -156,7 +147,7 @@ interface ChatContextType {
   setStreamedMessage: (content: string) => void;
   clearStreamedMessage: () => void;
   setGenerating: (isGenerating: boolean) => void;
-  setGeneratingRAG: (isGeneratingRAG: boolean) => void;
+
   setTools: (tools: Tool[]) => void;
   toggleTools: () => void;
   clearConversation: () => void;
@@ -196,10 +187,6 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     dispatch({ type: "SET_GENERATING", isGenerating });
   };
 
-  const setGeneratingRAG = (isGeneratingRAG: boolean) => {
-    dispatch({ type: "SET_GENERATING_RAG", isGeneratingRAG });
-  };
-
   const setTools = (tools: Tool[]) => {
     dispatch({ type: "SET_TOOLS", tools });
   };
@@ -226,7 +213,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     setStreamedMessage,
     clearStreamedMessage,
     setGenerating,
-    setGeneratingRAG,
+
     setTools,
     toggleTools,
     clearConversation,

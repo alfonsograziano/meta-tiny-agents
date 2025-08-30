@@ -101,17 +101,6 @@ export const useSocket = () => {
     return result.result;
   }, [emitWithPromise]);
 
-  const generateRagQueries = useCallback(
-    async (messages: ConversationMessage[]): Promise<string[]> => {
-      const result = await emitWithPromise<string[]>(
-        "generate-rag-queries",
-        messages
-      );
-      return result.result;
-    },
-    [emitWithPromise]
-  );
-
   const generateAnswer = useCallback(
     async (request: GenerateAnswerRequest): Promise<GenerateAnswerResponse> => {
       const result = await emitWithPromise<GenerateAnswerResponse>(
@@ -148,7 +137,7 @@ export const useSocket = () => {
     disconnect,
     emitWithPromise,
     listTools,
-    generateRagQueries,
+
     generateAnswer,
     generateRecipe,
   };

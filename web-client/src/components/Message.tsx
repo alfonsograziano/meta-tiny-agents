@@ -7,9 +7,14 @@ import { User, Bot, Wrench } from "lucide-react";
 interface MessageProps {
   message: ConversationMessage;
   isStreaming?: boolean;
+  isGenerating?: boolean;
 }
 
-export function Message({ message, isStreaming = false }: MessageProps) {
+export function Message({
+  message,
+  isStreaming = false,
+  isGenerating = false,
+}: MessageProps) {
   const getMessageIcon = () => {
     switch (message.role) {
       case "user":
@@ -53,6 +58,15 @@ export function Message({ message, isStreaming = false }: MessageProps) {
               </div>
             </div>
           ))}
+        </div>
+      );
+    }
+
+    if (isGenerating) {
+      return (
+        <div className="flex items-center gap-2 text-gray-300">
+          <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin"></div>
+          <span>Generating...</span>
         </div>
       );
     }
