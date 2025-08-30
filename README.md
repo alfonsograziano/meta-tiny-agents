@@ -17,8 +17,9 @@ A lightweight, intelligent agent framework with built-in RAG capabilities, memor
 - **🔄 Server-Client Architecture**: Separate server and client processes for scalable deployment
 - **📚 RAG System**: Automatic file indexing and retrieval with semantic search
 - **💾 Memory Persistence**: Save and load agent memories using RAG and pgvector
-- **🛠️ Built-in Tools**: Integrated MCP servers including code interpreter, Playwright, and filesystem access
+- **🛠️ Built-in Tools**: Integrated MCP servers including code interpreter, Playwright, filesystem access, and smart web content fetching
 - **🔧 Node.js Sandbox**: Safe code execution environment for dynamic tool creation
+- **🌐 Smart Web Fetching**: LLM-optimized web content extraction with clean text conversion
 
 ## Quick Start
 
@@ -27,6 +28,7 @@ A lightweight, intelligent agent framework with built-in RAG capabilities, memor
 - Node.js 18+
 - PostgreSQL with pgvector extension
 - OpenAI API key
+- Docker
 
 ### Installation
 
@@ -43,15 +45,7 @@ export OPENAI_API_KEY=your-key-here
 ```
 
 2. Configure your agent in `agent.json`:
-
-```json
-{
-  "name": "My Agent",
-  "model": "gpt-4",
-  "temperature": 0.7,
-  "maxTokens": 2000
-}
-```
+   Customize the params in the agent.json
 
 3. Set up your database connection in `docker-compose.yml` or environment variables
 
@@ -126,6 +120,14 @@ Persist agent memories across sessions:
 - File reading and writing
 - Directory traversal
 - File manipulation operations
+
+### Smart Web Content Fetching
+
+- Fetch and extract clean, LLM-optimized text content from webpages
+- Automatic content cleaning using Mozilla's Readability parser
+- Converts HTML to clean Markdown format
+- Resolves relative links to absolute URLs
+- Perfect for RAG systems and content analysis tasks
 
 ## Contributing
 
