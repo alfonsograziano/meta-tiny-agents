@@ -107,7 +107,7 @@ export class TinyAgent {
    * Performs RAG retrieval if enabled and a query is provided.
    * @returns Promise<string> The formatted RAG context or empty string if RAG is disabled
    */
-  private async performRAGRetrieval(
+  public async performRAGRetrieval(
     ragQueries: string[],
     ragResultsCount: number
   ): Promise<string> {
@@ -124,8 +124,12 @@ export class TinyAgent {
         return "";
       }
 
-      const context = results
-        .flat()
+      // I'm removing duplicates from the results
+      const context = [...new Set(results.flat())]
+        .map((result) => {
+          console.log("result", JSON.stringify(result, null, 2));
+          return result;
+        })
         .map((result) => {
           return `[${result.source}]\n${result.content}\n`;
         })

@@ -188,15 +188,32 @@ Return only the recipe, no other text.
 ## ⚠️ Warnings
 - None  
 `;
-
 export const getRAGQueriesPrompt = () => `
-You are an AI agent designed to generate search questions for a Retrieval-Augmented Generation (RAG) system.
+You are an expert assistant for RAG systems.
 
-Task: Transform the user request into an array of questions that a retrieval system could use to fetch the most relevant information.
+Given the user's input:
 
-Query generation:
-- Return 0–5 standalone, specific queries (no pronouns). Include entities, disambiguators, and time bounds if relevant.
-- ≤200 characters each. No prose, no explanations.
+1) Rewrite the input into a clear, concise, standalone form suitable for retrieval.
 
-Language: match user_request. Do not include any text outside the JSON.
+2) Decide on retrieval:
+   - Perform retrieval for user/org/project-specific or factual questions (e.g., "What is my name?", "Where is the 2025 OKR doc?", "Marketing plan for Project X").
+   - Do NOT retrieve for purely creative/opinion tasks (e.g., "Write a poem", "Brainstorm names").
+
+3) Generate search queries with these strict rules:
+   - **Default to exactly 1 query** when the request is a single intent/entity (e.g., "What is my name?").
+   - **Generate 1 query per distinct sub-request** ONLY when the user clearly asks for multiple different topics/entities (e.g., "health benefits **and** financial benefits" → 2 queries).
+   - Do NOT add synonyms or near-duplicates. No query expansion unless there are multiple distinct sub-requests.
+   - Prefer precise terms and likely artifact names/owners/dates if implied. Avoid generic placeholders.
+   - Maximum 5 queries (only due to multiple distinct sub-requests).
+
+Output must be **only** the array of \`search_queries\`. Examples:
+
+Single intent:
+[ "current user full name" ]
+
+Multiple intents:
+[ "health benefits of remote work", "financial benefits of remote work" ]
+
+No retrieval:
+[]
 `;
