@@ -22,11 +22,12 @@ const server = new McpServer(
 export const smartFetchSchema = {
   urls: z
     .array(z.string())
-    .describe("The parameters to use to fetch the data from the web"),
+    .describe(
+      "List of webpage URLs to fetch and convert into clean, LLM-friendly text."
+    ),
 };
 
 export const fetchUrlLLMFriendly = async (url: string) => {
-  console.log("Fetching URL: ", url);
   const html = await fetch(url).then((r) => r.text());
   // give Readability a real URL context so relatives can be resolved later
   const dom = new JSDOM(html, { url });
@@ -67,7 +68,7 @@ export const fetchUrlLLMFriendly = async (url: string) => {
 // Configure server tools and resources
 server.tool(
   "smart_fetch",
-  "Fetch data from the web - optimized for speed and returns LLM-friendly output",
+  "Fetch and extract clean, LLM-optimized text content from webpages given their URLs.",
   smartFetchSchema,
   async (params) => {
     const { urls } = params;

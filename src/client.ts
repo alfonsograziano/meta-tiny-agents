@@ -128,7 +128,7 @@ try {
             function: { name: string; description: string };
           }[]
         >("list-tools", "");
-        const clients = tools.map((tool) => tool.clientName);
+        const clients = [...new Set(tools.map((tool) => tool.clientName))];
 
         printSystemMessage(
           tools
@@ -211,6 +211,7 @@ try {
     }
   }
 } catch (error) {
+  console.log(error);
   printSystemMessage("Server is not running...");
   const { input: result } = await promptUser(
     "Do you want to start it now? (y/n) ",

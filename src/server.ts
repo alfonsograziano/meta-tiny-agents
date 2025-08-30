@@ -100,6 +100,14 @@ const clients = [
     .then(() => {
       console.log("[MCP]: RAG Memory client initialized");
     }),
+  agent
+    .getClientsRegistry()
+    .register("stdio", "smart-fetch", "npm", ["run", "start-smart-fetch-mcp"], {
+      PATH: process.env.PATH!,
+    })
+    .then(() => {
+      console.log("[MCP]: Smart Fetch client initialized");
+    }),
 ];
 
 const start = Date.now();
