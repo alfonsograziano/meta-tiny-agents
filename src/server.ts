@@ -10,8 +10,13 @@ import { getRecipePrompt } from "./prompts.ts";
 const PORT = 3000;
 const io = new Server(PORT);
 
+//TODO: Fix this - load properly the API key
+const API_KEY = agentConfig.baseURL?.includes("google")
+  ? process.env.GEMINI_API_KEY!
+  : process.env.OPENAI_API_KEY!;
+
 const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY!,
+  apiKey: API_KEY,
   baseURL: agentConfig.baseURL,
 });
 
