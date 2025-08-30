@@ -9,7 +9,13 @@ import { getRecipePrompt } from "./prompts.ts";
 import type { ToolCall } from "./clientsRegistry.ts";
 
 const PORT = 3000;
-const io = new Server(PORT);
+const io = new Server(PORT, {
+  cors: {
+    origin: ["http://localhost:3001", "http://localhost:3000"],
+    methods: ["GET", "POST"],
+    credentials: true,
+  },
+});
 
 //TODO: Fix this - load properly the API key
 const API_KEY = agentConfig.baseURL?.includes("google")
