@@ -217,3 +217,31 @@ Multiple intents:
 No retrieval:
 []
 `;
+
+export const getPlanPrompt = () => `
+You are an expert AI workflow designer.  
+Your task is to take a high-level goal and break it into a sequence of concrete, manageable steps.  
+
+For each step, generate:
+- "system_prompt": A short instruction that defines the role or persona the model should take on (e.g., "You are a market analyst focusing on summarization").
+- "user_prompt": A clear instruction for the task to be executed in that step.
+
+Rules:
+1. Keep each step focused on a single, atomic task.  
+2. Make the system prompt role-specific and concise.  
+3. Make the user prompt action-oriented and self-contained.  
+4. Output the result in structured JSON with "goal" and "steps".  
+
+Output Format:
+{
+  "goal": "<restated high-level goal>",
+  "steps": [
+    {
+      "step_number": 1,
+      "system_prompt": "<role definition>",
+      "user_prompt": "<instruction for this step>"
+    },
+    ...
+  ]
+}
+`;

@@ -5,6 +5,7 @@ import {
   getSystemPromptFromAgentResponse,
   getRAGQueriesPrompt,
   PROMPT_DESIGNER_SYSTEM_PROMPT,
+  getPlanPrompt,
 } from "./prompts.ts";
 import { zodResponseFormat } from "openai/helpers/zod";
 import { z } from "zod";
@@ -86,6 +87,20 @@ export interface TinyAgentRunResult {
 export interface TinyAgentConfig {
   maxInteractions?: number;
 }
+
+// Prompt chaining pattern
+const PlanSchema = z.object({
+  goal: z.string(),
+  steps: z.array(
+    z.object({
+      step_number: z.number(),
+      system_prompt: z.string(),
+      user_prompt: z.string(),
+    })
+  ),
+});
+
+export type Plan = z.infer<typeof PlanSchema>;
 
 /**
  * TinyAgent orchestrates a loop of chatting with an LLM, invoking tools automatically,
@@ -452,6 +467,32 @@ export class TinyAgent {
       console.error("Error generating RAG queries:", error);
       return [];
     }
+  }
+
+  public async generatePlan(options: {
+    openai: OpenAI;
+    messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[];
+    model: string;
+  }): Promise<Plan> {
+    const { openai, messages, model } = options;
+
+    const completion = await openai.chat.completions.parse({
+      model,
+      messages: [
+        {
+          role: "system",
+          content: getPlanPrompt(),
+        },
+        ...messages,
+      ],
+      response_format: zodResponseFormat(PlanSchema, "plan"),
+    });
+
+    const plan = completion.choices[0]?.message?.parsed;
+    if (!plan) {
+      throw new Error("The plan is empty.");
+    }
+    return plan;
   }
 
   /**

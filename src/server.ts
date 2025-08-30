@@ -238,6 +238,21 @@ io.on("connection", (socket) => {
     }
   );
 
+  socket.on(
+    "generate-plan",
+    async (
+      input: OpenAI.Chat.Completions.ChatCompletionMessageParam[],
+      callback
+    ) => {
+      const plan = await agent.generatePlan({
+        openai,
+        messages: input,
+        model: agentConfig.model,
+      });
+      callback({ status: "ok", result: plan });
+    }
+  );
+
   socket.on("call-tool", async (input: { toolCall: ToolCall }, callback) => {
     const result = await agent.getClientsRegistry().callTool(input.toolCall);
     callback({ status: "ok", result });

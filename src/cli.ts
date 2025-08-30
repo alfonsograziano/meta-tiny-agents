@@ -92,6 +92,10 @@ export const commands = [
     description:
       "Start the browser used by Playwright, useful to configure accounts",
   },
+  {
+    name: "generate_plan",
+    description: "Generate a plan to solve a specific task",
+  },
 ];
 
 export const availableCommands = commands.map((command) => command.name);

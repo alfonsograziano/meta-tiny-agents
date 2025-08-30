@@ -12,7 +12,8 @@
     "start-rag-mcp": "tsx --env-file .env src/rag/rag-mcp.ts",
     "start-smart-fetch-mcp": "tsx --env-file .env src/smartFetch/index.ts",
     "start-client": "tsx --env-file .env src/client.ts",
-    "start-server": "tsx --env-file .env src/server.ts"
+    "start-server": "tsx --env-file .env src/server.ts",
+    "start-planner-agent": "tsx --env-file .env src/plannerAgent.ts"
   },
   "author": "",
   "license": "ISC",
