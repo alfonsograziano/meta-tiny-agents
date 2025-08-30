@@ -3,6 +3,12 @@
 import React from "react";
 import { ConversationMessage } from "../types";
 import { User, Bot, Wrench } from "lucide-react";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 
 interface MessageProps {
   message: ConversationMessage;
@@ -43,25 +49,94 @@ export function Message({
     }
   };
 
-  const renderContent = () => {
-    if (message.tool_calls && message.tool_calls.length > 0) {
-      return (
-        <div className="space-y-2">
-          {message.tool_calls.map((toolCall, index) => (
-            <div key={index} className="bg-gray-700 p-3 rounded-lg">
-              <div className="text-sm text-gray-300 mb-2">
-                Calling tool:{" "}
-                <span className="text-blue-400 font-mono">
-                  {toolCall.function.name}
+  const renderToolCalls = () => {
+    if (!message.tool_calls || message.tool_calls.length === 0) return null;
+
+    return (
+      <Accordion type="multiple" className="w-full">
+        {message.tool_calls.map((toolCall, index) => (
+          <AccordionItem key={index} value={`tool-call-${index}`}>
+            <AccordionTrigger className="text-left hover:no-underline">
+              <div className="flex items-center gap-2">
+                <Wrench className="w-4 h-4 text-blue-400" />
+                <span className="text-sm font-medium">
+                  Tool {toolCall.function.name} called...
                 </span>
               </div>
-              <div className="text-xs text-gray-400 font-mono bg-gray-800 p-2 rounded">
-                {toolCall.function.arguments}
+            </AccordionTrigger>
+            <AccordionContent>
+              <div className="space-y-3 pt-2">
+                <div>
+                  <span className="text-xs text-gray-400 block mb-1">
+                    Arguments:
+                  </span>
+                  <div className="text-xs text-gray-300 font-mono bg-gray-700 p-2 rounded border border-gray-600">
+                    {toolCall.function.arguments}
+                  </div>
+                </div>
+                {toolCall.id && (
+                  <div>
+                    <span className="text-xs text-gray-400 block mb-1">
+                      Tool Call ID:
+                    </span>
+                    <div className="text-xs text-gray-300 font-mono bg-gray-700 p-2 rounded border border-gray-600">
+                      {toolCall.id}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </AccordionContent>
+          </AccordionItem>
+        ))}
+      </Accordion>
+    );
+  };
+
+  const renderToolResult = () => {
+    if (message.role !== "tool") return null;
+
+    return (
+      <Accordion type="single" collapsible className="w-full">
+        <AccordionItem value="tool-result">
+          <AccordionTrigger className="text-left hover:no-underline">
+            <div className="flex items-center gap-2">
+              <Wrench className="w-4 h-4 text-yellow-400" />
+              <span className="text-sm font-medium">
+                Tool {message.tool_call_id || "unknown"} completed
+              </span>
+            </div>
+          </AccordionTrigger>
+          <AccordionContent>
+            <div className="space-y-3 pt-2">
+              {message.tool_call_id && (
+                <div>
+                  <span className="text-xs text-gray-400 block mb-1">
+                    Tool Call ID:
+                  </span>
+                  <div className="text-xs text-gray-300 font-mono bg-gray-700 p-2 rounded border border-gray-600">
+                    {message.tool_call_id}
+                  </div>
+                </div>
+              )}
+              <div>
+                <span className="text-xs text-gray-400 block mb-1">
+                  Result:
+                </span>
+                <div className="text-xs text-gray-300 font-mono bg-gray-700 p-2 rounded border border-gray-600 max-h-32 overflow-y-auto">
+                  {message.content || "No content"}
+                </div>
               </div>
             </div>
-          ))}
-        </div>
-      );
+          </AccordionContent>
+        </AccordionItem>
+      </Accordion>
+    );
+  };
+
+  const renderContent = () => {
+    // Handle tool calls (when assistant is calling tools)
+    if (message.tool_calls && message.tool_calls.length > 0) {
+      return renderToolCalls();
     }
 
     if (isGenerating) {
@@ -80,7 +155,7 @@ export function Message({
     if (message.content) {
       return (
         <div className="whitespace-pre-wrap">
-          {message.content}
+          {message.role !== "tool" && message.content}
           {isStreaming && (
             <span className="inline-block w-2 h-4 bg-white ml-1 animate-pulse" />
           )}
@@ -107,6 +182,7 @@ export function Message({
 
       <div className={`rounded-lg p-4 ${getMessageStyle()}`}>
         {renderContent()}
+        {message.role === "tool" && renderToolResult()}
       </div>
 
       {message.role === "user" && (
