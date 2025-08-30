@@ -25,7 +25,9 @@ export function ChatInput({
     if (!input.trim() || disabled) return;
 
     if (isCommandMode) {
-      onCommand(input.trim());
+      // Remove the leading slash for commands
+      const command = input.trim().replace(/^\//, "");
+      onCommand(command);
       setIsCommandMode(false);
     } else {
       onSendMessage(input.trim());
