@@ -6,6 +6,7 @@ import { printLogo, printSystemMessage } from "./cli.ts";
 import { agentConfig } from "./config.js";
 import { RAG } from "./rag/rag.ts";
 import { getRecipePrompt } from "./prompts.ts";
+import type { ToolCall } from "./clientsRegistry.ts";
 
 const PORT = 3000;
 const io = new Server(PORT);
@@ -27,6 +28,7 @@ const agent = new TinyAgent({
 printLogo();
 
 printSystemMessage("Welcome to Tiny Agent - let's get started!");
+printSystemMessage("Agent config: " + JSON.stringify(agentConfig, null, 2));
 printSystemMessage("--------------------------------");
 printSystemMessage("Initializing MCP clients...");
 
@@ -227,6 +229,11 @@ io.on("connection", (socket) => {
       callback({ status: "ok", result: queries });
     }
   );
+
+  socket.on("call-tool", async (input: { toolCall: ToolCall }, callback) => {
+    const result = await agent.getClientsRegistry().callTool(input.toolCall);
+    callback({ status: "ok", result });
+  });
 
   socket.on("disconnect", () => {
     console.log("Client disconnected:", socket.id);
