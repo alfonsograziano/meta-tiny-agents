@@ -103,16 +103,6 @@ export function ChatInput({
             rows={1}
             disabled={disabled}
           />
-
-          <div className="absolute right-3 bottom-3 flex items-center gap-2">
-            <button
-              type="button"
-              className="p-1 text-gray-400 hover:text-gray-300 hover:bg-gray-700 rounded transition-colors"
-              title="Voice input (coming soon)"
-            >
-              <Mic className="w-4 h-4" />
-            </button>
-          </div>
         </div>
 
         <button
