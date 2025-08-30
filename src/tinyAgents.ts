@@ -126,17 +126,13 @@ export class TinyAgent {
 
       // I'm removing duplicates from the results
       const context = [...new Set(results.flat())]
-        .map((result) => {
-          console.log("result", JSON.stringify(result, null, 2));
-          return result;
-        })
+
         .map((result) => {
           return `[${result.source}]\n${result.content}\n`;
         })
         .join("\n");
 
       const ragContext = `\n--- RELEVANT CONTEXT FROM KNOWLEDGE BASE ---\n${context}\n--- END CONTEXT ---\n\nBased on the above context, please proceed with the user's request.`;
-      console.log("ragContext in performRAGRetrieval", ragContext);
       return ragContext;
     } catch (error) {
       return "";
@@ -189,7 +185,6 @@ export class TinyAgent {
         options.ragQueries,
         ragResultsCount
       );
-      console.log("ragContext", ragContext);
     }
 
     // Add RAG context to base messages if available
@@ -212,11 +207,6 @@ export class TinyAgent {
         });
       }
     }
-
-    console.log(
-      "enhancedBaseMessages",
-      JSON.stringify(enhancedBaseMessages, null, 2)
-    );
 
     const mcpTools = await this.registry.getTools();
     // Map MCP tools into OpenAI's ChatCompletionTool format

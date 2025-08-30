@@ -144,8 +144,6 @@ io.on("connection", (socket) => {
         };
       }
 
-      console.log("ragQueries on the server", input.ragQueries);
-
       const result = await agent.run({
         openai,
         baseMessages: input.messages,

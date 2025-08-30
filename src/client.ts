@@ -191,8 +191,6 @@ try {
         printSystemMessage("RAG queries generated. Building your answer...");
       }
 
-      console.log("ragQueries on the client", ragQueries);
-
       const { result: answer } = await socketEmitPromisified<{
         content: string;
         streamed: boolean;
