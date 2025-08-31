@@ -99,6 +99,167 @@
   background: #9ca3af;
 }
 
+/* Markdown styling */
+.markdown-content {
+  color: #e5e7eb;
+  line-height: 1.6;
+}
+
+.markdown-content h1,
+.markdown-content h2,
+.markdown-content h3,
+.markdown-content h4,
+.markdown-content h5,
+.markdown-content h6 {
+  color: #ffffff;
+  margin-top: 1.5rem;
+  margin-bottom: 1rem;
+  font-weight: 600;
+}
+
+.markdown-content h1 {
+  font-size: 1.5rem;
+  border-bottom: 1px solid #374151;
+  padding-bottom: 0.5rem;
+}
+
+.markdown-content h2 {
+  font-size: 1.25rem;
+}
+
+.markdown-content h3 {
+  font-size: 1.125rem;
+}
+
+.markdown-content p {
+  margin-bottom: 1rem;
+}
+
+.markdown-content ul,
+.markdown-content ol {
+  margin-bottom: 1rem;
+  padding-left: 1.5rem;
+}
+
+.markdown-content li {
+  margin-bottom: 0.5rem;
+}
+
+.markdown-content blockquote {
+  border-left: 4px solid #6b7280;
+  padding-left: 1rem;
+  margin: 1rem 0;
+  font-style: italic;
+  color: #9ca3af;
+}
+
+.markdown-content a {
+  color: #60a5fa;
+  text-decoration: underline;
+}
+
+.markdown-content a:hover {
+  color: #93c5fd;
+}
+
+.markdown-content table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1rem 0;
+}
+
+.markdown-content th,
+.markdown-content td {
+  border: 1px solid #4b5563;
+  padding: 0.5rem;
+  text-align: left;
+}
+
+.markdown-content th {
+  background-color: #374151;
+  font-weight: 600;
+}
+
+.markdown-content code {
+  background-color: #374151;
+  padding: 0.125rem 0.25rem;
+  border-radius: 0.25rem;
+  font-family: "Monaco", "Menlo", "Ubuntu Mono", monospace;
+  font-size: 0.875rem;
+}
+
+.markdown-content pre {
+  background-color: #1f2937;
+  padding: 1rem;
+  border-radius: 0.5rem;
+  overflow-x: auto;
+  overflow-y: hidden;
+  border: 1px solid #374151;
+  margin: 1rem 0;
+  white-space: pre;
+  word-wrap: normal;
+  position: relative;
+}
+
+/* Ensure copy button is always visible */
+.copy-button {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  z-index: 20;
+  opacity: 0.8;
+  transition: opacity 0.2s ease;
+}
+
+.copy-button:hover {
+  opacity: 1;
+}
+
+.markdown-content pre code {
+  background-color: transparent;
+  padding: 0;
+  border-radius: 0;
+}
+
+/* Syntax highlighting styles */
+.hljs {
+  background: transparent !important;
+  color: #e5e7eb !important;
+}
+
+.hljs-keyword {
+  color: #fbbf24 !important;
+}
+
+.hljs-string {
+  color: #34d399 !important;
+}
+
+.hljs-number {
+  color: #f87171 !important;
+}
+
+.hljs-function {
+  color: #60a5fa !important;
+}
+
+.hljs-comment {
+  color: #9ca3af !important;
+  font-style: italic;
+}
+
+.hljs-variable {
+  color: #a78bfa !important;
+}
+
+.hljs-operator {
+  color: #fbbf24 !important;
+}
+
+.hljs-punctuation {
+  color: #e5e7eb !important;
+}
+
 @theme inline {
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);

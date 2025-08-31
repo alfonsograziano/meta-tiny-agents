@@ -1,14 +1,20 @@
 "use client";
 
-import React from "react";
+import React, { useMemo, useCallback } from "react";
 import { ConversationMessage } from "../types";
 import { User, Bot, Wrench } from "lucide-react";
+import ReactMarkdown from "react-markdown";
+import rehypeRaw from "rehype-raw";
+import remarkGfm from "remark-gfm";
+import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
+import { oneDark } from "react-syntax-highlighter/dist/cjs/styles/prism";
 import {
   Accordion,
   AccordionContent,
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
+import { CopyButton } from "./CopyButton";
 
 interface MessageProps {
   message: ConversationMessage;
@@ -23,7 +29,232 @@ export function Message({
   isGenerating = false,
   isGeneratingRAG = false,
 }: MessageProps) {
-  const getMessageIcon = () => {
+  // Memoize the markdown components to prevent recreation on every render
+  const markdownComponents = useMemo(() => {
+    const CodeComponent = React.memo(
+      ({
+        node,
+        inline,
+        className,
+        children,
+        ...props
+      }: {
+        node?: unknown;
+        inline?: boolean;
+        className?: string;
+        children?: React.ReactNode;
+      }) => {
+        const match = /language-(\w+)/.exec(className || "");
+        const language = match ? match[1] : "text";
+
+        return !inline ? (
+          <div className="relative group">
+            <CopyButton content={String(children)} />
+            <SyntaxHighlighter
+              language={language}
+              style={oneDark}
+              customStyle={{
+                margin: 0,
+                borderRadius: "0.5rem",
+                border: "1px solid #374151",
+              }}
+              showLineNumbers={false}
+              wrapLines={false}
+            >
+              {String(children)}
+            </SyntaxHighlighter>
+          </div>
+        ) : (
+          <code className="bg-gray-700 px-1 py-0.5 rounded text-sm" {...props}>
+            {children}
+          </code>
+        );
+      }
+    );
+    CodeComponent.displayName = "CodeComponent";
+
+    const H1Component = React.memo(
+      ({ children, ...props }: { children?: React.ReactNode }) => (
+        <h1 className="text-xl font-bold text-white mb-3" {...props}>
+          {children}
+        </h1>
+      )
+    );
+    H1Component.displayName = "H1Component";
+
+    const H2Component = React.memo(
+      ({ children, ...props }: { children?: React.ReactNode }) => (
+        <h2 className="text-lg font-bold text-white mb-2" {...props}>
+          {children}
+        </h2>
+      )
+    );
+    H2Component.displayName = "H2Component";
+
+    const H3Component = React.memo(
+      ({ children, ...props }: { children?: React.ReactNode }) => (
+        <h3 className="text-base font-bold text-white mb-2" {...props}>
+          {children}
+        </h3>
+      )
+    );
+    H3Component.displayName = "H3Component";
+
+    const UlComponent = React.memo(
+      ({ children, ...props }: { children?: React.ReactNode }) => (
+        <ul className="list-disc list-inside space-y-1 mb-3" {...props}>
+          {children}
+        </ul>
+      )
+    );
+    UlComponent.displayName = "UlComponent";
+
+    const OlComponent = React.memo(
+      ({ children, ...props }: { children?: React.ReactNode }) => (
+        <ol className="list-decimal list-inside space-y-1 mb-3" {...props}>
+          {children}
+        </ol>
+      )
+    );
+    OlComponent.displayName = "OlComponent";
+
+    const AComponent = React.memo(
+      ({
+        children,
+        href,
+        ...props
+      }: {
+        children?: React.ReactNode;
+        href?: string;
+      }) => (
+        <a
+          href={href}
+          className="text-blue-400 hover:text-blue-300 underline"
+          target="_blank"
+          rel="noopener noreferrer"
+          {...props}
+        >
+          {children}
+        </a>
+      )
+    );
+    AComponent.displayName = "AComponent";
+
+    const BlockquoteComponent = React.memo(
+      ({ children, ...props }: { children?: React.ReactNode }) => (
+        <blockquote
+          className="border-l-4 border-gray-600 pl-4 italic text-gray-300 mb-3"
+          {...props}
+        >
+          {children}
+        </blockquote>
+      )
+    );
+    BlockquoteComponent.displayName = "BlockquoteComponent";
+
+    const TableComponent = React.memo(
+      ({ children, ...props }: { children?: React.ReactNode }) => (
+        <div className="overflow-x-auto mb-3">
+          <table
+            className="min-w-full border-collapse border border-gray-600"
+            {...props}
+          >
+            {children}
+          </table>
+        </div>
+      )
+    );
+    TableComponent.displayName = "TableComponent";
+
+    const ThComponent = React.memo(
+      ({ children, ...props }: { children?: React.ReactNode }) => (
+        <th
+          className="border border-gray-600 px-3 py-2 bg-gray-700 text-left font-semibold"
+          {...props}
+        >
+          {children}
+        </th>
+      )
+    );
+    ThComponent.displayName = "ThComponent";
+
+    const TdComponent = React.memo(
+      ({ children, ...props }: { children?: React.ReactNode }) => (
+        <td className="border border-gray-600 px-3 py-2" {...props}>
+          {children}
+        </td>
+      )
+    );
+    TdComponent.displayName = "TdComponent";
+
+    return {
+      code: CodeComponent,
+      h1: H1Component,
+      h2: H2Component,
+      h3: H3Component,
+      ul: UlComponent,
+      ol: OlComponent,
+      a: AComponent,
+      blockquote: BlockquoteComponent,
+      table: TableComponent,
+      th: ThComponent,
+      td: TdComponent,
+    };
+  }, []);
+
+  // Memoize the markdown detection to avoid recalculating on every render
+  const markdownInfo = useMemo(() => {
+    if (!message.content) return { hasMarkdown: false, hasCodeBlocks: false };
+
+    const hasMarkdown = /[#*`\[\]()>|]/.test(message.content);
+    const hasCodeBlocks = /```[\s\S]*```/.test(message.content);
+
+    return { hasMarkdown, hasCodeBlocks };
+  }, [message.content]);
+
+  // Memoize the markdown content rendering
+  const markdownContent = useMemo(() => {
+    if (!markdownInfo.hasMarkdown && !markdownInfo.hasCodeBlocks) return null;
+
+    return (
+      <div className="relative">
+        <div className="markdown-content">
+          <ReactMarkdown
+            remarkPlugins={[remarkGfm]}
+            rehypePlugins={[rehypeRaw]}
+            components={markdownComponents}
+          >
+            {message.content}
+          </ReactMarkdown>
+          {isStreaming && (
+            <span className="inline-block w-2 h-4 bg-white ml-1 animate-pulse" />
+          )}
+        </div>
+      </div>
+    );
+  }, [
+    message.content,
+    markdownInfo.hasMarkdown,
+    markdownInfo.hasCodeBlocks,
+    markdownComponents,
+    isStreaming,
+  ]);
+
+  // Memoize the regular text content
+  const textContent = useMemo(() => {
+    if (!message.content) return null;
+
+    return (
+      <div className="whitespace-pre-wrap">
+        {message.role !== "tool" && message.content}
+        {isStreaming && (
+          <span className="inline-block w-2 h-4 bg-white ml-1 animate-pulse" />
+        )}
+      </div>
+    );
+  }, [message.content, message.role, isStreaming]);
+
+  const getMessageIcon = useCallback(() => {
     switch (message.role) {
       case "user":
         return <User className="w-5 h-5 text-blue-400" />;
@@ -34,9 +265,9 @@ export function Message({
       default:
         return null;
     }
-  };
+  }, [message.role]);
 
-  const getMessageStyle = () => {
+  const getMessageStyle = useCallback(() => {
     switch (message.role) {
       case "user":
         return "bg-gray-700 text-white ml-auto max-w-[80%]";
@@ -47,9 +278,9 @@ export function Message({
       default:
         return "bg-gray-600 text-white mr-auto max-w-[80%]";
     }
-  };
+  }, [message.role]);
 
-  const renderToolCalls = () => {
+  const renderToolCalls = useCallback(() => {
     if (!message.tool_calls || message.tool_calls.length === 0) return null;
 
     return (
@@ -90,9 +321,9 @@ export function Message({
         ))}
       </Accordion>
     );
-  };
+  }, [message.tool_calls]);
 
-  const renderToolResult = () => {
+  const renderToolResult = useCallback(() => {
     if (message.role !== "tool") return null;
 
     return (
@@ -131,9 +362,9 @@ export function Message({
         </AccordionItem>
       </Accordion>
     );
-  };
+  }, [message.role, message.tool_call_id, message.content]);
 
-  const renderContent = () => {
+  const renderContent = useCallback(() => {
     // Handle tool calls (when assistant is calling tools)
     if (message.tool_calls && message.tool_calls.length > 0) {
       return renderToolCalls();
@@ -153,18 +384,26 @@ export function Message({
     }
 
     if (message.content) {
-      return (
-        <div className="whitespace-pre-wrap">
-          {message.role !== "tool" && message.content}
-          {isStreaming && (
-            <span className="inline-block w-2 h-4 bg-white ml-1 animate-pulse" />
-          )}
-        </div>
-      );
+      // Return memoized content based on markdown detection
+      if (markdownInfo.hasMarkdown || markdownInfo.hasCodeBlocks) {
+        return markdownContent;
+      } else {
+        return textContent;
+      }
     }
 
     return null;
-  };
+  }, [
+    message.tool_calls,
+    message.content,
+    isGenerating,
+    isGeneratingRAG,
+    markdownInfo.hasMarkdown,
+    markdownInfo.hasCodeBlocks,
+    markdownContent,
+    textContent,
+    renderToolCalls,
+  ]);
 
   if (message.role === "system") {
     return null; // Don't render system messages in the UI
