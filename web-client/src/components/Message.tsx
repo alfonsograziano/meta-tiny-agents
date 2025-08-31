@@ -48,7 +48,7 @@ export function Message({
         const language = match ? match[1] : "text";
 
         return !inline ? (
-          <div className="relative group">
+          <div className="relative group -m-4">
             <CopyButton content={String(children)} />
             <SyntaxHighlighter
               language={language}
