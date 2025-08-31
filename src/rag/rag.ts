@@ -47,8 +47,6 @@ export class RAG {
   }
 
   public async sync() {
-    await this.ensureSchema();
-
     const files = this.getFilesFromDir(this.docsDir);
     this.log(`Found ${files.length} files in ${this.docsDir}, indexing...`);
 
@@ -111,7 +109,6 @@ export class RAG {
 
   public async reindexAll() {
     this.log("🔄 Starting full re-index...");
-    await this.ensureSchema();
 
     // Delete all existing data
     this.log("🗑️  Clearing all existing indexed data...");
@@ -176,39 +173,6 @@ export class RAG {
   }
 
   // ---------- PRIVATE HELPERS ----------
-
-  private async ensureSchema() {
-    await this.pool.query(`
-      CREATE TABLE IF NOT EXISTS files (
-        id SERIAL PRIMARY KEY,
-        path TEXT UNIQUE NOT NULL,
-        last_modified TIMESTAMP NOT NULL,
-        last_indexed TIMESTAMP NOT NULL,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      );
-    `);
-
-    await this.pool.query(`
-      CREATE TABLE IF NOT EXISTS memory (
-        id SERIAL PRIMARY KEY,
-        text TEXT NOT NULL,
-        last_modified TIMESTAMP NOT NULL,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      );
-    `);
-
-    await this.pool.query(`
-      CREATE TABLE IF NOT EXISTS memory_chunks (
-        id SERIAL PRIMARY KEY,
-        file_id INT REFERENCES files(id) ON DELETE CASCADE,
-        memory_id INT REFERENCES memory(id) ON DELETE CASCADE,
-        chunk_index INT NOT NULL,
-        content TEXT NOT NULL,
-        embedding VECTOR(1536),
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      );
-    `);
-  }
 
   // Drop-in: same name + (optional) overlap parameter via a default.
   private chunkText(

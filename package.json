@@ -12,14 +12,19 @@
     "start-rag-mcp": "tsx --env-file .env src/rag/rag-mcp.ts",
     "start-smart-fetch-mcp": "tsx --env-file .env src/smartFetch/index.ts",
     "start-client": "tsx --env-file .env src/client.ts",
-    "start-server": "tsx --env-file .env src/server.ts",
-    "start-planner-agent": "tsx --env-file .env src/plannerAgent.ts"
+    "start-server": "npm run migrate && tsx --env-file .env src/server.ts",
+    "start-planner-agent": "tsx --env-file .env src/plannerAgent.ts",
+    "migrate": "node db/create-db.js && db-migrate --migrations-dir db/migrations --config db/database.json up",
+    "migrate-down": "db-migrate --migrations-dir db/migrations --config db/database.json down"
   },
   "author": "",
   "license": "ISC",
   "description": "",
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.12.1",
+    "db-migrate": "^0.11.14",
+    "db-migrate-pg": "^1.5.2",
+    "dotenv": "^17.2.1",
     "openai": "^5.1.1",
     "pdf-parse": "^1.1.1",
     "pg": "^8.16.3",
