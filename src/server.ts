@@ -7,6 +7,7 @@ import { agentConfig } from "./config.js";
 import { RAG } from "./rag/rag.ts";
 import { getRecipePrompt } from "./prompts.ts";
 import type { ToolCall } from "./clientsRegistry.ts";
+import { ConversationsStorage } from "./conversationsStorage.js";
 
 const PORT = 3000;
 const io = new Server(PORT, {
@@ -30,6 +31,9 @@ const openai = new OpenAI({
 const agent = new TinyAgent({
   maxInteractions: agentConfig.maxToolcallsPerInteraction,
 });
+
+// Initialize conversations storage
+const conversationsStorage = new ConversationsStorage();
 
 printLogo();
 
@@ -136,10 +140,93 @@ printSystemMessage(
 io.on("connection", (socket) => {
   console.log("Client connected:", socket.id);
 
+  // Track current conversation for this socket
+  let currentConversationId: string | null = null;
+
   socket.on("list-tools", async (input, callback) => {
     const tools = await agent.getClientsRegistry().getTools();
     callback({ status: "ok", result: tools });
   });
+
+  // Conversation management events
+  socket.on(
+    "create-conversation",
+    async (input: { name?: string }, callback) => {
+      try {
+        const conversation = await conversationsStorage.createConversation(
+          input.name
+        );
+        callback({ status: "ok", result: conversation });
+      } catch (error) {
+        callback({ status: "error", error: (error as Error).message });
+      }
+    }
+  );
+
+  socket.on("list-conversations", async (input, callback) => {
+    try {
+      const conversations = await conversationsStorage.listConversations();
+      callback({ status: "ok", result: conversations });
+    } catch (error) {
+      callback({ status: "error", error: (error as Error).message });
+    }
+  });
+
+  socket.on("get-conversation", async (input: { id: string }, callback) => {
+    try {
+      const conversation = await conversationsStorage.getConversation(input.id);
+      console.log("conversation", JSON.stringify(conversation, null, 2));
+      if (!conversation) {
+        callback({ status: "error", error: "Conversation not found" });
+        return;
+      }
+      callback({ status: "ok", result: conversation });
+    } catch (error) {
+      callback({ status: "error", error: (error as Error).message });
+    }
+  });
+
+  socket.on("delete-conversation", async (input: { id: string }, callback) => {
+    try {
+      await conversationsStorage.deleteConversation(input.id);
+      callback({ status: "ok", result: "Conversation deleted" });
+    } catch (error) {
+      callback({ status: "error", error: (error as Error).message });
+    }
+  });
+
+  socket.on(
+    "rename-conversation",
+    async (input: { id: string; name: string }, callback) => {
+      try {
+        await conversationsStorage.renameConversation(input.id, input.name);
+        callback({ status: "ok", result: "Conversation renamed" });
+      } catch (error) {
+        callback({ status: "error", error: (error as Error).message });
+      }
+    }
+  );
+
+  socket.on(
+    "set-current-conversation",
+    async (input: { id: string }, callback) => {
+      try {
+        const conversation = await conversationsStorage.getConversation(
+          input.id
+        );
+        console.log("conversation", JSON.stringify(conversation, null, 2));
+
+        if (!conversation) {
+          callback({ status: "error", error: "Conversation not found" });
+          return;
+        }
+        currentConversationId = input.id;
+        callback({ status: "ok", result: "Current conversation set" });
+      } catch (error) {
+        callback({ status: "error", error: (error as Error).message });
+      }
+    }
+  );
 
   socket.on(
     "generate-answer",
@@ -150,6 +237,15 @@ io.on("connection", (socket) => {
       },
       callback
     ) => {
+      // Update conversation with the new messages from the user
+      // So that if the user disconnects, we can continue from the last message
+      if (currentConversationId) {
+        await conversationsStorage.updateConversation(
+          currentConversationId,
+          input.messages
+        );
+      }
+
       let streamedContent = "";
       let onStreamAnswer = undefined;
 
@@ -174,12 +270,27 @@ io.on("connection", (socket) => {
         },
       });
 
+      const lastMessageContent =
+        result.conversation[result.conversation.length - 1].content;
+      const content =
+        typeof lastMessageContent === "string"
+          ? lastMessageContent
+          : JSON.stringify(lastMessageContent);
+
+      // Update conversation with the new message from the agent
+      // And the tool usages
+      if (currentConversationId) {
+        await conversationsStorage.updateConversation(
+          currentConversationId,
+          result.conversation
+        );
+      }
+
       if (!streamedContent) {
         callback({
           status: "ok",
           result: {
-            content:
-              result.conversation[result.conversation.length - 1].content,
+            content,
             streamed: false,
           },
         });
@@ -187,8 +298,7 @@ io.on("connection", (socket) => {
         callback({
           status: "ok",
           result: {
-            content:
-              result.conversation[result.conversation.length - 1].content,
+            content,
             streamed: true,
           },
         });
@@ -266,5 +376,7 @@ io.on("connection", (socket) => {
 
   socket.on("disconnect", () => {
     console.log("Client disconnected:", socket.id);
+    // Reset conversation tracking for this socket
+    currentConversationId = null;
   });
 });

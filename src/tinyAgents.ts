@@ -345,16 +345,6 @@ export class TinyAgent {
         let result = "";
         if (functionName === "task_complete") {
           taskCompleteAck++;
-        } else if (functionName === "ask_question") {
-          if (typeof options.requestInputFromUser !== "function") {
-            throw new Error(
-              "Function 'ask_question' requires a requestInputFromUser callback to be provided."
-            );
-          }
-          const { input } = await options.requestInputFromUser(
-            params.questions
-          );
-          result = input;
         } else {
           result = await this.registry.callTool(toolCall);
         }
