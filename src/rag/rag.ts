@@ -4,6 +4,14 @@ import type { FileAdapter } from "./adapters/FileAdapter.ts";
 import type { Embedder } from "./embedders/index.ts";
 import type { VectorStore } from "./storage/VectorStore.js";
 
+type TextSplitter = {
+  //TODO: Implement (or steal fromm the internet) more strategies
+  strategy: string;
+  options: {
+    chunkSize: number;
+    chunkOverlapPercentage: number;
+  };
+};
 export interface RAGConfig {
   logsAllowed?: boolean;
   embedder: Embedder;
@@ -15,24 +23,27 @@ export interface RAGConfig {
   };
 
   vectorStore: VectorStore;
+
+  textSplitter: TextSplitter;
 }
 
 export class RAG {
   private vectorStore: VectorStore;
   private embedder: Embedder;
-  private readonly CHUNK_SIZE = 500;
   private filesystemIndexing: {
     enabled: boolean;
     workspaceDir: string;
     adapters: FileAdapter[];
   };
   private logsAllowed: boolean;
+  private textSplitter: TextSplitter;
 
   constructor(config: RAGConfig) {
     this.vectorStore = config.vectorStore;
     this.embedder = config.embedder;
     this.filesystemIndexing = config.filesystemIndexing;
     this.logsAllowed = config ? config.logsAllowed ?? false : false;
+    this.textSplitter = config.textSplitter;
   }
 
   public async sync() {
@@ -89,12 +100,17 @@ export class RAG {
         continue;
       }
 
-      const chunks = this.chunkText(text, this.CHUNK_SIZE);
+      const chunks = this.chunkText(text, {
+        chunkSize: this.textSplitter.options.chunkSize,
+        chunkOverlapPercentage:
+          this.textSplitter.options.chunkOverlapPercentage,
+      });
+      console.log("Chunks:", JSON.stringify(chunks, null, 2));
       const embeddings = await this.embedder.embed(chunks);
 
       const fileId = await this.vectorStore.upsertFile(filePath, lastModified);
 
-      await this.clearFileChunks(fileId);
+      await this.vectorStore.clearChunksForFile(fileId);
       await this.vectorStore.insertChunksForFile(fileId, chunks, embeddings);
     }
 
@@ -124,7 +140,10 @@ export class RAG {
     const memoryId = await this.vectorStore.upsertMemory(data, new Date());
 
     // Chunk the text and create embeddings
-    const chunks = this.chunkText(data, this.CHUNK_SIZE);
+    const chunks = this.chunkText(data, {
+      chunkSize: this.textSplitter.options.chunkSize,
+      chunkOverlapPercentage: this.textSplitter.options.chunkOverlapPercentage,
+    });
     const embeddings = await this.embedder.embed(chunks);
 
     // Insert chunks with memory_id instead of file_id
@@ -144,13 +163,22 @@ export class RAG {
   // Drop-in: same name + (optional) overlap parameter via a default.
   private chunkText(
     text: string,
-    size: number,
-    overlap: number = Math.floor(size * 0.15)
+    options: {
+      chunkSize: number;
+      chunkOverlapPercentage: number;
+    }
   ): string[] {
     if (typeof text !== "string") return [];
-    if (!Number.isFinite(size) || size <= 0) return [text];
+    let size = options.chunkSize;
+    let overlap = Math.floor(
+      (options.chunkSize * options.chunkOverlapPercentage) / 100
+    );
+
+    if (!Number.isFinite(options.chunkSize) || options.chunkSize <= 0)
+      return [text];
     if (!Number.isFinite(overlap) || overlap < 0) overlap = 0;
-    if (overlap >= size) overlap = Math.max(0, Math.floor(size / 3)); // keep sane
+    if (overlap >= options.chunkSize)
+      overlap = Math.max(0, Math.floor(options.chunkSize / 3)); // keep sane
 
     const SEPARATORS = ["\n\n", "\n", " ", ""]; // paragraphs -> lines -> words -> chars
 
@@ -241,10 +269,6 @@ export class RAG {
     };
 
     return splitRecursive(text, size, SEPARATORS);
-  }
-
-  private async clearFileChunks(fileId: number) {
-    await this.vectorStore.clearChunksForFile(fileId);
   }
 
   private getFilesFromDir(dir: string): string[] {

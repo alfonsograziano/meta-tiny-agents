@@ -10,6 +10,13 @@
     "filesystemIndexing": {
       "enabled": true,
       "workspaceDir": "./data"
+    },
+    "textSplitter": {
+      "strategy": "recursive-character-chunker",
+      "options": {
+        "chunkSize": 500,
+        "chunkOverlapPercentage": 10
+      }
     }
   }
 }

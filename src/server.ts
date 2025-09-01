@@ -49,6 +49,7 @@ const rag = new RAG({
       database: process.env.POSTGRES_DB ?? "ragdb",
     })
   ),
+  textSplitter: agentConfig.rag.textSplitter,
   logsAllowed: true,
 });
 
@@ -146,7 +147,7 @@ const clients = [
 ];
 
 const start = Date.now();
-await Promise.all(clients);
+Promise.all(clients);
 const elapsedTime = (Date.now() - start) / 1000;
 printSystemMessage(`MCP clients initialized in ${elapsedTime.toFixed(2)}s\n\n`);
 

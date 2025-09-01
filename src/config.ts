@@ -21,6 +21,13 @@ const configSchema = z.object({
       enabled: z.boolean(),
       workspaceDir: z.string(),
     }),
+    textSplitter: z.object({
+      strategy: z.string(),
+      options: z.object({
+        chunkSize: z.number(),
+        chunkOverlapPercentage: z.number(),
+      }),
+    }),
   }),
 });
 

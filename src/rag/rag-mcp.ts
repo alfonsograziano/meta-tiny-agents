@@ -39,6 +39,13 @@ const rag = new RAG({
       database: process.env.POSTGRES_DB ?? "ragdb",
     })
   ),
+  textSplitter: {
+    strategy: "recursive-character-chunker",
+    options: {
+      chunkSize: 500,
+      chunkOverlapPercentage: 10,
+    },
+  },
 });
 // Schemas for tool inputs
 export const retrieveMemorySchema = {
