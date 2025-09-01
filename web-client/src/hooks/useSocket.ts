@@ -8,6 +8,7 @@ import {
   Tool,
   GenerateAnswerRequest,
   GenerateAnswerResponse,
+  StoredConversation,
 } from "../types";
 
 export const useSocket = () => {
@@ -131,6 +132,53 @@ export const useSocket = () => {
     [emitWithPromise]
   );
 
+  // Conversation management methods
+  const createConversation = useCallback(
+    async (name?: string): Promise<StoredConversation> => {
+      const result = await emitWithPromise<StoredConversation>(
+        "create-conversation",
+        { name }
+      );
+      return result.result;
+    },
+    [emitWithPromise]
+  );
+
+  const listConversations = useCallback(async (): Promise<
+    StoredConversation[]
+  > => {
+    const result = await emitWithPromise<StoredConversation[]>(
+      "list-conversations",
+      ""
+    );
+    return result.result;
+  }, [emitWithPromise]);
+
+  const getConversation = useCallback(
+    async (id: string): Promise<StoredConversation> => {
+      const result = await emitWithPromise<StoredConversation>(
+        "get-conversation",
+        { id }
+      );
+      return result.result;
+    },
+    [emitWithPromise]
+  );
+
+  const deleteConversation = useCallback(
+    async (id: string): Promise<void> => {
+      await emitWithPromise<void>("delete-conversation", { id });
+    },
+    [emitWithPromise]
+  );
+
+  const renameConversation = useCallback(
+    async (id: string, name: string): Promise<void> => {
+      await emitWithPromise<void>("rename-conversation", { id, name });
+    },
+    [emitWithPromise]
+  );
+
   useEffect(() => {
     connect();
 
@@ -151,5 +199,10 @@ export const useSocket = () => {
     generateRagQueries,
     generateAnswer,
     generateRecipe,
+    createConversation,
+    listConversations,
+    getConversation,
+    deleteConversation,
+    renameConversation,
   };
 };

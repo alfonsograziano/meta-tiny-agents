@@ -1,21 +1,31 @@
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { Message } from "./Message";
 import { ChatInput } from "./ChatInput";
-import { Sidebar } from "./Sidebar";
+import { ConversationsSidebar } from "./ConversationsSidebar";
 import { useSocket } from "../hooks/useSocket";
 import { useChat } from "../contexts/ChatContext";
 import {
   ToolCall,
   ToolCallResult,
-  ToolCallEvent,
-  ToolCallResultEvent,
+  StoredConversation,
+  ConversationMessage,
 } from "../types";
-import { Bot, AlertCircle, CheckCircle, Loader2 } from "lucide-react";
+import {
+  Bot,
+  AlertCircle,
+  CheckCircle,
+  Loader2,
+  Wrench,
+  MessageSquare,
+  Trash2,
+} from "lucide-react";
 import { ToolAccordion } from "./ToolAccordion";
 
 export function Chat() {
+  const router = useRouter();
   const {
     socket,
     isConnected,
@@ -25,6 +35,10 @@ export function Chat() {
     generateRagQueries,
     generateAnswer,
     generateRecipe,
+    createConversation,
+    listConversations,
+    deleteConversation,
+    renameConversation,
   } = useSocket();
   const {
     state,
@@ -37,13 +51,22 @@ export function Chat() {
     setGenerating,
     setTools,
     clearConversation,
+    setCurrentConversation,
+    setConversations,
+    addConversation,
+    updateConversation,
+    removeConversation,
+    loadConversationMessages,
   } = useChat();
 
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [conversationsSidebarOpen, setConversationsSidebarOpen] =
+    useState(false);
   const [showFullConversation, setShowFullConversation] = useState(false);
   const [streamingContent, setStreamingContent] = useState("");
   const [ragEnabled, setRagEnabled] = useState(false);
   const [isGeneratingRAG, setIsGeneratingRAG] = useState(false);
+  const [isLoadingConversations, setIsLoadingConversations] = useState(false);
+  const [conversationsLoaded, setConversationsLoaded] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll to bottom
@@ -164,6 +187,7 @@ export function Chat() {
       await generateAnswer({
         messages: [...state.messages, { role: "user", content: message }],
         ragQueries,
+        conversationId: state.currentConversationId || undefined,
       });
 
       // The response will be handled by socket streaming events
@@ -246,6 +270,141 @@ export function Chat() {
     setShowFullConversation(false);
   };
 
+  // Conversation management functions
+  const handleCreateConversation = async () => {
+    try {
+      const newConversation = await createConversation();
+      addConversation(newConversation);
+      setCurrentConversation(newConversation.id);
+      clearConversation();
+      setConversationsSidebarOpen(false);
+      // Redirect to the new conversation
+      router.push(`/chat/${newConversation.id}`);
+    } catch (error) {
+      console.error("Failed to create conversation:", error);
+    }
+  };
+
+  const handleSelectConversation = async (conversation: StoredConversation) => {
+    try {
+      console.log("Selecting conversation:", conversation);
+      console.log("Messages type:", typeof conversation.messages);
+      console.log("Messages value:", conversation.messages);
+
+      // Set as current conversation in frontend
+      setCurrentConversation(conversation.id);
+
+      // Load conversation messages with safety check
+      let messages: ConversationMessage[] = [];
+      if (Array.isArray(conversation.messages)) {
+        messages = conversation.messages;
+      }
+
+      console.log("Processed messages:", messages);
+      loadConversationMessages(messages);
+      setConversationsSidebarOpen(false);
+      // Redirect to the selected conversation
+      router.push(`/chat/${conversation.id}`);
+    } catch (error) {
+      console.error("Failed to select conversation:", error);
+    }
+  };
+
+  const handleDeleteConversation = async (id: string) => {
+    try {
+      await deleteConversation(id);
+      removeConversation(id);
+
+      // If this was the current conversation, clear it
+      if (state.currentConversationId === id) {
+        setCurrentConversation(null);
+        clearConversation();
+      }
+    } catch (error) {
+      console.error("Failed to delete conversation:", error);
+    }
+  };
+
+  const handleRenameConversation = async (id: string, name: string) => {
+    try {
+      await renameConversation(id, name);
+
+      // Update the conversation in the list
+      const updatedConversation = state.conversations.find((c) => c.id === id);
+      if (updatedConversation) {
+        updateConversation({
+          ...updatedConversation,
+          name,
+        });
+      }
+    } catch (error) {
+      console.error("Failed to rename conversation:", error);
+    }
+  };
+
+  // Function to refresh conversations manually
+  const refreshConversations = useCallback(async () => {
+    if (isConnected) {
+      try {
+        setIsLoadingConversations(true);
+        const conversations = await listConversations();
+        setConversations(conversations);
+        // Don't reset conversationsLoaded here as this is a manual refresh
+      } catch (error) {
+        console.error("Failed to refresh conversations:", error);
+      } finally {
+        setIsLoadingConversations(false);
+      }
+    }
+  }, [isConnected, listConversations]);
+
+  // Command handler for tools and help
+  const onCommand = (command: string) => {
+    handleCommand(command);
+  };
+
+  // Load conversations on mount and when connection status changes
+  useEffect(() => {
+    if (isConnected && !conversationsLoaded) {
+      const loadConversations = async () => {
+        try {
+          setIsLoadingConversations(true);
+          const conversations = await listConversations();
+          setConversations(conversations);
+          setConversationsLoaded(true);
+        } catch (error) {
+          console.error("Failed to load conversations:", error);
+        } finally {
+          setIsLoadingConversations(false);
+        }
+      };
+
+      loadConversations();
+    } else if (!isConnected) {
+      // Reset when disconnected
+      setConversationsLoaded(false);
+      setConversations([]);
+    }
+  }, [isConnected, listConversations, conversationsLoaded]); // Added conversationsLoaded to prevent multiple loads
+
+  // Cleanup effect
+  useEffect(() => {
+    return () => {
+      // Reset conversations when component unmounts
+      setConversations([]);
+      setConversationsLoaded(false);
+    };
+  }, []);
+
+  // Debug effect to monitor messages state
+  useEffect(() => {
+    console.log("Messages state changed:", {
+      messagesCount: state.messages.length,
+      messages: state.messages,
+      currentConversationId: state.currentConversationId,
+    });
+  }, [state.messages, state.currentConversationId]);
+
   // Connection status component
   const ConnectionStatus = () => {
     if (isConnecting) {
@@ -293,29 +452,80 @@ export function Chat() {
             <div className="flex flex-col gap-1">
               <h1 className="text-xl font-bold text-white">Tiny Agents Chat</h1>
               <ConnectionStatus />
+              {state.currentConversationId && (
+                <div className="text-xs text-blue-300">
+                  {
+                    state.conversations.find(
+                      (c) => c.id === state.currentConversationId
+                    )?.name
+                  }
+                </div>
+              )}
             </div>
           </div>
 
-          <div className="flex items-center gap-2 text-sm text-gray-400">
+          <div className="flex items-center gap-4 text-sm text-gray-400">
             {isGeneratingRAG && (
               <div className="flex items-center gap-2">
                 <Loader2 className="w-4 h-4 animate-spin" />
                 <span>Searching for relevant information...</span>
               </div>
             )}
+
+            {/* Back to conversations button */}
+            <button
+              onClick={() => router.push("/")}
+              className="bg-gray-700 hover:bg-gray-600 text-gray-300 hover:text-white px-3 py-1 rounded-lg transition-colors flex items-center gap-2"
+            >
+              <MessageSquare className="w-4 h-4" />
+              Conversations
+            </button>
+
+            {/* Tools button */}
+            <button
+              onClick={() => onCommand("list_tools")}
+              className="bg-gray-700 hover:bg-gray-600 text-gray-300 hover:text-white px-3 py-1 rounded-lg transition-colors flex items-center gap-2"
+            >
+              <Wrench className="w-4 h-4" />
+              Tools
+            </button>
+
+            {/* Help button */}
+            <button
+              onClick={() => onCommand("help")}
+              className="bg-gray-700 hover:bg-gray-600 text-gray-300 hover:text-white px-3 py-1 rounded-lg transition-colors flex items-center gap-2"
+            >
+              <MessageSquare className="w-4 h-4" />
+              Help
+            </button>
+
+            {/* Clear conversation button */}
+            <button
+              onClick={handleClearConversation}
+              className="bg-red-700 hover:bg-red-600 text-red-200 hover:text-white px-3 py-1 rounded-lg transition-colors flex items-center gap-2"
+            >
+              <Trash2 className="w-4 h-4" />
+              Clear
+            </button>
           </div>
         </div>
       </div>
 
       {/* Main Content Area - Flex container */}
       <div className="flex flex-1 min-h-0">
-        <Sidebar
-          isOpen={sidebarOpen}
-          onToggle={() => setSidebarOpen(!sidebarOpen)}
-          tools={state.tools}
-          onCommand={handleCommand}
-          onClearConversation={handleClearConversation}
-          messageCount={state.messages.length}
+        <ConversationsSidebar
+          isOpen={conversationsSidebarOpen}
+          onToggle={() =>
+            setConversationsSidebarOpen(!conversationsSidebarOpen)
+          }
+          conversations={state.conversations}
+          currentConversationId={state.currentConversationId}
+          onCreateConversation={handleCreateConversation}
+          onSelectConversation={handleSelectConversation}
+          onDeleteConversation={handleDeleteConversation}
+          onRenameConversation={handleRenameConversation}
+          onRefreshConversations={refreshConversations}
+          isLoading={isLoadingConversations}
         />
 
         <div className="flex-1 flex justify-center">
@@ -330,6 +540,72 @@ export function Chat() {
                   <h2 className="text-xl font-semibold mb-2">
                     Welcome to Tiny Agents
                   </h2>
+                  {state.currentConversationId ? (
+                    <div className="space-y-2">
+                      <p className="text-blue-400 mb-2">
+                        Current conversation:{" "}
+                        {
+                          state.conversations.find(
+                            (c) => c.id === state.currentConversationId
+                          )?.name
+                        }
+                      </p>
+                      <div className="text-sm text-gray-500">
+                        Messages: {state.messages.length}
+                      </div>
+                      <button
+                        onClick={() => {
+                          const currentConv = state.conversations.find(
+                            (c) => c.id === state.currentConversationId
+                          );
+                          if (currentConv) {
+                            console.log("Current conversation:", currentConv);
+                            console.log(
+                              "Current messages state:",
+                              state.messages
+                            );
+                          }
+                        }}
+                        className="bg-gray-600 hover:bg-gray-500 text-white px-2 py-1 rounded text-xs"
+                      >
+                        Debug Info
+                      </button>
+                    </div>
+                  ) : state.conversations.length === 0 ? (
+                    <div className="space-y-2">
+                      <p className="text-gray-500 mb-2">
+                        No conversations yet. Create your first conversation to
+                        get started!
+                      </p>
+                      <button
+                        onClick={handleCreateConversation}
+                        className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors"
+                      >
+                        Create First Conversation
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <p className="text-gray-500 mb-2">
+                        No active conversation. Create a new one or select an
+                        existing one from the sidebar.
+                      </p>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={handleCreateConversation}
+                          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors"
+                        >
+                          New Conversation
+                        </button>
+                        <button
+                          onClick={() => router.push("/")}
+                          className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg transition-colors"
+                        >
+                          View All Conversations
+                        </button>
+                      </div>
+                    </div>
+                  )}
                   <p>Start a conversation by typing a message below.</p>
                 </div>
               ) : (

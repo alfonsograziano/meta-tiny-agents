@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useMemo, useCallback } from "react";
-import { ConversationMessage } from "../types";
+import { ConversationMessage, hasToolCalls } from "../types";
 import { User, Bot, Wrench } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import rehypeRaw from "rehype-raw";
@@ -15,6 +15,7 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { CopyButton } from "./CopyButton";
+import { OpenAI } from "openai";
 
 interface MessageProps {
   message: ConversationMessage;
@@ -206,8 +207,8 @@ export function Message({
   const markdownInfo = useMemo(() => {
     if (!message.content) return { hasMarkdown: false, hasCodeBlocks: false };
 
-    const hasMarkdown = /[#*`\[\]()>|]/.test(message.content);
-    const hasCodeBlocks = /```[\s\S]*```/.test(message.content);
+    const hasMarkdown = /[#*`\[\]()>|]/.test(String(message.content));
+    const hasCodeBlocks = /```[\s\S]*```/.test(String(message.content));
 
     return { hasMarkdown, hasCodeBlocks };
   }, [message.content]);
@@ -224,7 +225,7 @@ export function Message({
             rehypePlugins={[rehypeRaw]}
             components={markdownComponents}
           >
-            {message.content}
+            {String(message.content)}
           </ReactMarkdown>
           {isStreaming && (
             <span className="inline-block w-2 h-4 bg-white ml-1 animate-pulse" />
@@ -246,7 +247,7 @@ export function Message({
 
     return (
       <div className="whitespace-pre-wrap">
-        {message.role !== "tool" && message.content}
+        {message.role !== "tool" && String(message.content)}
         {isStreaming && (
           <span className="inline-block w-2 h-4 bg-white ml-1 animate-pulse" />
         )}
@@ -281,50 +282,66 @@ export function Message({
   }, [message.role]);
 
   const renderToolCalls = useCallback(() => {
-    if (!message.tool_calls || message.tool_calls.length === 0) return null;
+    if (!hasToolCalls(message)) return null;
+    const toolCalls = message.tool_calls;
+
+    if (!toolCalls || toolCalls.length === 0) return null;
 
     return (
       <Accordion type="multiple" className="w-full">
-        {message.tool_calls.map((toolCall, index) => (
-          <AccordionItem key={index} value={`tool-call-${index}`}>
-            <AccordionTrigger className="text-left hover:no-underline">
-              <div className="flex items-center gap-2">
-                <Wrench className="w-4 h-4 text-blue-400" />
-                <span className="text-sm font-medium">
-                  Tool {toolCall.function.name} called...
-                </span>
-              </div>
-            </AccordionTrigger>
-            <AccordionContent>
-              <div className="space-y-3 pt-2">
-                <div>
-                  <span className="text-xs text-gray-400 block mb-1">
-                    Arguments:
+        {toolCalls.map(
+          (
+            toolCall: OpenAI.Chat.Completions.ChatCompletionMessageToolCall,
+            index: number
+          ) => (
+            <AccordionItem key={index} value={`tool-call-${index}`}>
+              <AccordionTrigger className="text-left hover:no-underline">
+                <div className="flex items-center gap-2">
+                  <Wrench className="w-4 h-4 text-blue-400" />
+                  <span className="text-sm font-medium">
+                    Tool{" "}
+                    {toolCall.type === "function"
+                      ? toolCall.function.name
+                      : "Custom Tool"}{" "}
+                    called...
                   </span>
-                  <div className="text-xs text-gray-300 font-mono bg-gray-700 p-2 rounded border border-gray-600">
-                    {toolCall.function.arguments}
-                  </div>
                 </div>
-                {toolCall.id && (
+              </AccordionTrigger>
+              <AccordionContent>
+                <div className="space-y-3 pt-2">
                   <div>
                     <span className="text-xs text-gray-400 block mb-1">
-                      Tool Call ID:
+                      {toolCall.type === "function" ? "Arguments:" : "Input:"}
                     </span>
                     <div className="text-xs text-gray-300 font-mono bg-gray-700 p-2 rounded border border-gray-600">
-                      {toolCall.id}
+                      {toolCall.type === "function"
+                        ? toolCall.function.arguments
+                        : JSON.stringify(toolCall.custom.input)}
                     </div>
                   </div>
-                )}
-              </div>
-            </AccordionContent>
-          </AccordionItem>
-        ))}
+                  {toolCall.id && (
+                    <div>
+                      <span className="text-xs text-gray-400 block mb-1">
+                        Tool Call ID:
+                      </span>
+                      <div className="text-xs text-gray-300 font-mono bg-gray-700 p-2 rounded border border-gray-600">
+                        {toolCall.id}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+          )
+        )}
       </Accordion>
     );
-  }, [message.tool_calls]);
+  }, [message]);
 
   const renderToolResult = useCallback(() => {
     if (message.role !== "tool") return null;
+
+    console.log("message", message);
 
     return (
       <Accordion type="single" collapsible className="w-full">
@@ -354,7 +371,7 @@ export function Message({
                   Result:
                 </span>
                 <div className="text-xs text-gray-300 font-mono bg-gray-700 p-2 rounded border border-gray-600 max-h-32 overflow-y-auto">
-                  {message.content || "No content"}
+                  {String(message.content) || "No content"}
                 </div>
               </div>
             </div>
@@ -362,11 +379,11 @@ export function Message({
         </AccordionItem>
       </Accordion>
     );
-  }, [message.role, message.tool_call_id, message.content]);
+  }, [message]);
 
   const renderContent = useCallback(() => {
     // Handle tool calls (when assistant is calling tools)
-    if (message.tool_calls && message.tool_calls.length > 0) {
+    if (hasToolCalls(message)) {
       return renderToolCalls();
     }
 
@@ -394,8 +411,7 @@ export function Message({
 
     return null;
   }, [
-    message.tool_calls,
-    message.content,
+    message,
     isGenerating,
     isGeneratingRAG,
     markdownInfo.hasMarkdown,
@@ -420,7 +436,7 @@ export function Message({
       )}
 
       <div className={`rounded-lg p-4 ${getMessageStyle()}`}>
-        {renderContent()}
+        {message.role !== "tool" && renderContent()}
         {message.role === "tool" && renderToolResult()}
       </div>
 

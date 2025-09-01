@@ -1,6 +1,12 @@
 "use client";
 
-import React, { createContext, useContext, useReducer, ReactNode } from "react";
+import React, {
+  createContext,
+  useContext,
+  useReducer,
+  ReactNode,
+  useCallback,
+} from "react";
 import {
   ConversationMessage,
   ToolCall,
@@ -8,6 +14,7 @@ import {
   Tool,
   ToolCallEvent,
   ToolCallResultEvent,
+  StoredConversation,
 } from "../types";
 
 interface ChatState {
@@ -18,6 +25,8 @@ interface ChatState {
   showTools: boolean;
   toolCallEvents: ToolCallEvent[];
   toolResultEvents: ToolCallResultEvent[];
+  currentConversationId: string | null;
+  conversations: StoredConversation[];
 }
 
 type ChatAction =
@@ -33,7 +42,13 @@ type ChatAction =
   | { type: "SET_TOOLS"; tools: Tool[] }
   | { type: "TOGGLE_TOOLS" }
   | { type: "CLEAR_CONVERSATION" }
-  | { type: "SET_SYSTEM_MESSAGE"; content: string };
+  | { type: "SET_SYSTEM_MESSAGE"; content: string }
+  | { type: "SET_CURRENT_CONVERSATION"; id: string | null }
+  | { type: "SET_CONVERSATIONS"; conversations: StoredConversation[] }
+  | { type: "ADD_CONVERSATION"; conversation: StoredConversation }
+  | { type: "UPDATE_CONVERSATION"; conversation: StoredConversation }
+  | { type: "REMOVE_CONVERSATION"; id: string }
+  | { type: "LOAD_CONVERSATION_MESSAGES"; messages: ConversationMessage[] };
 
 const initialState: ChatState = {
   messages: [],
@@ -43,6 +58,8 @@ const initialState: ChatState = {
   showTools: false,
   toolCallEvents: [],
   toolResultEvents: [],
+  currentConversationId: null,
+  conversations: [],
 };
 
 function chatReducer(state: ChatState, action: ChatAction): ChatState {
@@ -97,7 +114,6 @@ function chatReducer(state: ChatState, action: ChatAction): ChatState {
             role: "tool",
             content: JSON.stringify(action.toolResult.result),
             tool_call_id: action.toolResult.toolCallId,
-            type: "function_call_output",
           },
         ],
       };
@@ -159,6 +175,53 @@ function chatReducer(state: ChatState, action: ChatAction): ChatState {
         messages: [{ role: "system", content: action.content }],
       };
 
+    case "SET_CURRENT_CONVERSATION":
+      return {
+        ...state,
+        currentConversationId: action.id,
+      };
+
+    case "SET_CONVERSATIONS":
+      return {
+        ...state,
+        conversations: action.conversations,
+      };
+
+    case "ADD_CONVERSATION":
+      return {
+        ...state,
+        conversations: [action.conversation, ...state.conversations],
+      };
+
+    case "UPDATE_CONVERSATION":
+      return {
+        ...state,
+        conversations: state.conversations.map((conv) =>
+          conv.id === action.conversation.id ? action.conversation : conv
+        ),
+      };
+
+    case "REMOVE_CONVERSATION":
+      return {
+        ...state,
+        conversations: state.conversations.filter(
+          (conv) => conv.id !== action.id
+        ),
+        currentConversationId:
+          state.currentConversationId === action.id
+            ? null
+            : state.currentConversationId,
+      };
+
+    case "LOAD_CONVERSATION_MESSAGES":
+      console.log("Loading conversation messages:", action.messages);
+      return {
+        ...state,
+        messages: action.messages,
+        toolCallEvents: [],
+        toolResultEvents: [],
+      };
+
     default:
       return state;
   }
@@ -181,6 +244,14 @@ interface ChatContextType {
   toggleTools: () => void;
   clearConversation: () => void;
   setSystemMessage: (content: string) => void;
+
+  // Conversation management
+  setCurrentConversation: (id: string | null) => void;
+  setConversations: (conversations: StoredConversation[]) => void;
+  addConversation: (conversation: StoredConversation) => void;
+  updateConversation: (conversation: StoredConversation) => void;
+  removeConversation: (id: string) => void;
+  loadConversationMessages: (messages: ConversationMessage[]) => void;
 }
 
 const ChatContext = createContext<ChatContextType | undefined>(undefined);
@@ -240,6 +311,37 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     dispatch({ type: "SET_SYSTEM_MESSAGE", content });
   };
 
+  // Conversation management methods
+  const setCurrentConversation = useCallback((id: string | null) => {
+    dispatch({ type: "SET_CURRENT_CONVERSATION", id });
+  }, []);
+
+  const setConversations = useCallback(
+    (conversations: StoredConversation[]) => {
+      dispatch({ type: "SET_CONVERSATIONS", conversations });
+    },
+    []
+  );
+
+  const addConversation = useCallback((conversation: StoredConversation) => {
+    dispatch({ type: "ADD_CONVERSATION", conversation });
+  }, []);
+
+  const updateConversation = useCallback((conversation: StoredConversation) => {
+    dispatch({ type: "UPDATE_CONVERSATION", conversation });
+  }, []);
+
+  const removeConversation = useCallback((id: string) => {
+    dispatch({ type: "REMOVE_CONVERSATION", id });
+  }, []);
+
+  const loadConversationMessages = useCallback(
+    (messages: ConversationMessage[]) => {
+      dispatch({ type: "LOAD_CONVERSATION_MESSAGES", messages });
+    },
+    []
+  );
+
   const value: ChatContextType = {
     state,
     dispatch,
@@ -257,6 +359,14 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     toggleTools,
     clearConversation,
     setSystemMessage,
+
+    // Conversation management
+    setCurrentConversation,
+    setConversations,
+    addConversation,
+    updateConversation,
+    removeConversation,
+    loadConversationMessages,
   };
 
   return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;

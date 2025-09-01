@@ -1,9 +1,29 @@
-export interface ConversationMessage {
-  role: "system" | "user" | "assistant" | "tool";
-  content: string | null;
-  tool_calls?: ToolCall[];
-  tool_call_id?: string;
-  type?: string;
+import { OpenAI } from "openai";
+
+// Type guard to check if a message has tool_calls
+export function hasToolCalls(
+  message: ConversationMessage
+): message is OpenAI.Chat.Completions.ChatCompletionAssistantMessageParam {
+  return (
+    "tool_calls" in message &&
+    Array.isArray(message.tool_calls) &&
+    message.tool_calls.length > 0
+  );
+}
+
+// New conversation types for the backend storage
+export type ConversationMessage =
+  | OpenAI.Chat.Completions.ChatCompletionMessageParam
+  | OpenAI.Chat.Completions.ChatCompletionMessage
+  | OpenAI.Chat.Completions.ChatCompletionToolMessageParam
+  | OpenAI.Chat.Completions.ChatCompletionAssistantMessageParam;
+
+export interface StoredConversation {
+  id: string;
+  name: string;
+  messages: ConversationMessage[];
+  created_at: Date;
+  updated_at: Date;
 }
 
 export interface ToolCall {
@@ -57,6 +77,7 @@ export interface Tool {
 export interface GenerateAnswerRequest {
   messages: ConversationMessage[];
   ragQueries: string[];
+  conversationId?: string;
 }
 
 export interface GenerateAnswerResponse {
