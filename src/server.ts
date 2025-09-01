@@ -140,9 +140,6 @@ printSystemMessage(
 io.on("connection", (socket) => {
   console.log("Client connected:", socket.id);
 
-  // Track current conversation for this socket
-  let currentConversationId: string | null = null;
-
   socket.on("list-tools", async (input, callback) => {
     const tools = await agent.getClientsRegistry().getTools();
     callback({ status: "ok", result: tools });
@@ -208,40 +205,20 @@ io.on("connection", (socket) => {
   );
 
   socket.on(
-    "set-current-conversation",
-    async (input: { id: string }, callback) => {
-      try {
-        const conversation = await conversationsStorage.getConversation(
-          input.id
-        );
-        console.log("conversation", JSON.stringify(conversation, null, 2));
-
-        if (!conversation) {
-          callback({ status: "error", error: "Conversation not found" });
-          return;
-        }
-        currentConversationId = input.id;
-        callback({ status: "ok", result: "Current conversation set" });
-      } catch (error) {
-        callback({ status: "error", error: (error as Error).message });
-      }
-    }
-  );
-
-  socket.on(
     "generate-answer",
     async (
       input: {
         messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[];
         ragQueries: string[];
+        conversationId?: string;
       },
       callback
     ) => {
       // Update conversation with the new messages from the user
       // So that if the user disconnects, we can continue from the last message
-      if (currentConversationId) {
+      if (input.conversationId) {
         await conversationsStorage.updateConversation(
-          currentConversationId,
+          input.conversationId,
           input.messages
         );
       }
@@ -279,9 +256,9 @@ io.on("connection", (socket) => {
 
       // Update conversation with the new message from the agent
       // And the tool usages
-      if (currentConversationId) {
+      if (input.conversationId) {
         await conversationsStorage.updateConversation(
-          currentConversationId,
+          input.conversationId,
           result.conversation
         );
       }
@@ -376,7 +353,5 @@ io.on("connection", (socket) => {
 
   socket.on("disconnect", () => {
     console.log("Client disconnected:", socket.id);
-    // Reset conversation tracking for this socket
-    currentConversationId = null;
   });
 });

@@ -23,30 +23,18 @@ export type ToolCallResult = {
 /**
  * Represents a conversation message originating from a tool function call.
  */
-export interface ToolFunctionOutputMessage {
-  type: "function_call_output";
-  tool_call_id: string;
-  content: string;
-  role: "tool";
-}
-
-export interface ToolFunctionCallMessage {
-  type: "function_call";
-  tool_call_id: string;
-  content: string;
-  role: "tool";
-}
 
 /**
  * Union type for any message exchanged during the TinyAgent run:
  * - OpenAI.Chat.Completions.ChatCompletionMessageParam: messages sent to the LLM (system/user/function_call_output)
  * - OpenAI.Chat.Completions.ChatCompletionMessage: messages received from the LLM (assistant or function_call)
- * - ToolFunctionOutputMessage: messages returned by a tool
+ * - OpenAI.Chat.Completions.ChatCompletionToolMessageParam: messages returned by a tool
  */
 export type ConversationMessage =
   | OpenAI.Chat.Completions.ChatCompletionMessageParam
   | OpenAI.Chat.Completions.ChatCompletionMessage
-  | ToolFunctionOutputMessage;
+  | OpenAI.Chat.Completions.ChatCompletionToolMessageParam
+  | OpenAI.Chat.Completions.ChatCompletionAssistantMessageParam;
 
 /**
  * Telemetry for a single LLM invocation.
@@ -372,12 +360,12 @@ export class TinyAgent {
           durationMs: toolEnd - toolStart,
         });
 
-        const functionOutputMessage: ToolFunctionOutputMessage = {
-          type: "function_call_output",
-          tool_call_id: toolCallId,
-          content: JSON.stringify(result),
-          role: "tool",
-        };
+        const functionOutputMessage: OpenAI.Chat.Completions.ChatCompletionToolMessageParam =
+          {
+            tool_call_id: toolCallId,
+            content: JSON.stringify(result),
+            role: "tool",
+          };
         conversation.push(functionOutputMessage);
       }
     }
