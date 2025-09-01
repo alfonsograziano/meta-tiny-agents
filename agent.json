@@ -5,5 +5,11 @@
   "helperModel": "gpt-5-nano",
   "saveConversations": true,
   "enableStreaming": true,
-  "performRAGQueries": false
+  "performRAGQueries": false,
+  "rag": {
+    "filesystemIndexing": {
+      "enabled": true,
+      "workspaceDir": "./data"
+    }
+  }
 }

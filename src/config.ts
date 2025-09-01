@@ -14,6 +14,14 @@ const configSchema = z.object({
   enableStreaming: z.boolean().optional().default(false),
   // Whether to perform RAG queries at each interaction
   performRAGQueries: z.boolean().optional().default(false),
+
+  // RAG configuration
+  rag: z.object({
+    filesystemIndexing: z.object({
+      enabled: z.boolean(),
+      workspaceDir: z.string(),
+    }),
+  }),
 });
 
 const partialAgentConfig = configSchema.parse(

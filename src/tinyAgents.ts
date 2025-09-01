@@ -74,6 +74,7 @@ export interface TinyAgentRunResult {
  */
 export interface TinyAgentConfig {
   maxInteractions?: number;
+  rag: RAG;
 }
 
 // Prompt chaining pattern
@@ -97,13 +98,15 @@ export type Plan = z.infer<typeof PlanSchema>;
 export class TinyAgent {
   private readonly maxInteractions: number;
   private readonly registry: ClientsRegistry;
+  private readonly rag: RAG;
 
   /**
    * @param config.maxInteractions Maximum number of LLM ↔ tool iterations (default 10).
    */
-  constructor(config: TinyAgentConfig = {}) {
+  constructor(config: TinyAgentConfig) {
     this.maxInteractions = config.maxInteractions ?? 10;
     this.registry = new ClientsRegistry();
+    this.rag = config.rag;
   }
 
   /**
@@ -115,12 +118,8 @@ export class TinyAgent {
     ragResultsCount: number
   ): Promise<string> {
     try {
-      const ragQueryInstance = new RAG();
-
       const results = await Promise.all(
-        ragQueries.map((ragQuery) =>
-          ragQueryInstance.query(ragQuery, ragResultsCount)
-        )
+        ragQueries.map((ragQuery) => this.rag.query(ragQuery, ragResultsCount))
       );
 
       if (results.length === 0) {

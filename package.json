@@ -8,7 +8,6 @@
     "test:coverage": "vitest --coverage",
     "dev": "tsx --env-file .env src/index.ts",
     "start-browser": "tsx src/browser.ts",
-    "sync-rag": "tsx --env-file .env src/ragSync.ts",
     "start-rag-mcp": "tsx --env-file .env src/rag/rag-mcp.ts",
     "start-smart-fetch-mcp": "tsx --env-file .env src/smartFetch/index.ts",
     "start-client": "tsx --env-file .env src/client.ts",

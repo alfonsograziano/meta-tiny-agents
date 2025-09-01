@@ -1,7 +1,12 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
-import { RAG, type Env } from "./rag.js";
+import { RAG } from "./rag.js";
+import { OpenAIEmbedder } from "./embedders/OpenAIEmbedder.ts";
+import { PostgresVectorStore } from "./storage/PostgresVectorStore.ts";
+import { Pool } from "pg";
+import { TextAdapter } from "./adapters/TextAdapter.ts";
+import { PdfAdapter } from "./adapters/PdfAdapter.ts";
 
 const server = new McpServer(
   {
@@ -17,8 +22,23 @@ const server = new McpServer(
   }
 );
 
-const rag = new RAG(process.env as Env, {
+const rag = new RAG({
   logsAllowed: false, // Set to false as with MCP you cannot log on STDOUT
+  embedder: new OpenAIEmbedder({ apiKey: process.env.OPENAI_API_KEY ?? "" }),
+  filesystemIndexing: {
+    enabled: true,
+    workspaceDir: process.env.DOCS_DIR ?? "",
+    adapters: [new TextAdapter(), new PdfAdapter()],
+  },
+  vectorStore: new PostgresVectorStore(
+    new Pool({
+      host: process.env.POSTGRES_HOST ?? "localhost",
+      port: Number(process.env.POSTGRES_PORT ?? 5432),
+      user: process.env.POSTGRES_USER ?? "postgres",
+      password: process.env.POSTGRES_PASSWORD ?? "password",
+      database: process.env.POSTGRES_DB ?? "ragdb",
+    })
+  ),
 });
 // Schemas for tool inputs
 export const retrieveMemorySchema = {

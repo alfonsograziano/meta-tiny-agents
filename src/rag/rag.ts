@@ -1,57 +1,49 @@
-import { Pool } from "pg";
 import fs from "fs";
 import path from "path";
-import OpenAI from "openai";
 import type { FileAdapter } from "./adapters/FileAdapter.ts";
-import { TextAdapter, PdfAdapter } from "./adapters/index.ts";
+import type { Embedder } from "./embedders/index.ts";
+import type { VectorStore } from "./storage/VectorStore.js";
 
-export type Env = {
-  OPENAI_API_KEY?: string;
-  PGHOST?: string;
-  PGPORT?: string;
-  PGUSER?: string;
-  PGPASSWORD?: string;
-  PGDATABASE?: string;
-  DOCS_DIR?: string;
-};
+export interface RAGConfig {
+  logsAllowed?: boolean;
+  embedder: Embedder;
+
+  filesystemIndexing: {
+    enabled: boolean;
+    workspaceDir: string;
+    adapters: FileAdapter[];
+  };
+
+  vectorStore: VectorStore;
+}
 
 export class RAG {
-  private pool: Pool;
-  private openai: OpenAI;
-  private docsDir: string;
+  private vectorStore: VectorStore;
+  private embedder: Embedder;
   private readonly CHUNK_SIZE = 500;
-  private adapters: FileAdapter[];
+  private filesystemIndexing: {
+    enabled: boolean;
+    workspaceDir: string;
+    adapters: FileAdapter[];
+  };
   private logsAllowed: boolean;
 
-  constructor(
-    env: Env = process.env as Env,
-    config?: {
-      logsAllowed?: boolean;
-    }
-  ) {
-    if (!env.OPENAI_API_KEY) throw new Error("Missing OPENAI_API_KEY");
-    if (!env.DOCS_DIR) throw new Error("Missing DOCS_DIR");
-
-    this.pool = new Pool({
-      host: env.PGHOST ?? "localhost",
-      port: Number(env.PGPORT ?? 5432),
-      user: env.PGUSER ?? "postgres",
-      password: env.PGPASSWORD ?? "postgres",
-      database: env.PGDATABASE ?? "ragdb",
-    });
-
-    this.openai = new OpenAI({ apiKey: env.OPENAI_API_KEY });
-    this.docsDir = env.DOCS_DIR;
-    this.adapters = [new TextAdapter(), new PdfAdapter()];
+  constructor(config: RAGConfig) {
+    this.vectorStore = config.vectorStore;
+    this.embedder = config.embedder;
+    this.filesystemIndexing = config.filesystemIndexing;
     this.logsAllowed = config ? config.logsAllowed ?? false : false;
   }
 
   public async sync() {
-    const files = this.getFilesFromDir(this.docsDir);
-    this.log(`Found ${files.length} files in ${this.docsDir}, indexing...`);
+    if (!this.filesystemIndexing.enabled) return;
+    const dir = this.filesystemIndexing.workspaceDir;
+
+    const files = this.getFilesFromDir(dir);
+    this.log(`Found ${files.length} files in ${dir}, indexing...`);
 
     // Get all existing files from database
-    const existingFiles = await this.getAllFileRecords();
+    const existingFiles = await this.vectorStore.getAllFileRecords();
 
     // Find deleted files (files in DB but not in filesystem)
     const deletedFiles = existingFiles.filter((dbFile) => {
@@ -62,17 +54,17 @@ export class RAG {
     // Deindex deleted files
     for (const deletedFile of deletedFiles) {
       this.log(`Deindexing deleted file: ${deletedFile.path}`);
-      await this.deleteFileRecord(deletedFile.id);
+      await this.vectorStore.deleteFileRecord(deletedFile.id);
     }
 
     // Process existing files (index new/modified ones)
     for (const file of files) {
-      const filePath = path.join(this.docsDir, file);
+      const filePath = path.join(dir, file);
       const stat = fs.statSync(filePath);
       if (!stat.isFile()) continue;
 
       const lastModified = stat.mtime;
-      const existing = await this.getFileRecord(filePath);
+      const existing = await this.vectorStore.getFileRecord(filePath);
 
       if (
         existing &&
@@ -84,7 +76,9 @@ export class RAG {
 
       this.log(`Indexing file: ${file}`);
 
-      const adapter = this.adapters.find((a) => a.supports(filePath));
+      const adapter = this.filesystemIndexing.adapters.find((a) =>
+        a.supports(filePath)
+      );
       if (!adapter) {
         console.warn(`No adapter for file: ${file}, skipping...`);
         continue;
@@ -96,12 +90,12 @@ export class RAG {
       }
 
       const chunks = this.chunkText(text, this.CHUNK_SIZE);
-      const embeddings = await this.embedText(chunks);
+      const embeddings = await this.embedder.embed(chunks);
 
-      const fileId = await this.upsertFile(filePath, lastModified);
+      const fileId = await this.vectorStore.upsertFile(filePath, lastModified);
 
       await this.clearFileChunks(fileId);
-      await this.insertChunks(fileId, chunks, embeddings);
+      await this.vectorStore.insertChunksForFile(fileId, chunks, embeddings);
     }
 
     this.log("✅ Sync complete");
@@ -112,9 +106,7 @@ export class RAG {
 
     // Delete all existing data
     this.log("🗑️  Clearing all existing indexed data...");
-    await this.pool.query("DELETE FROM memory_chunks");
-    await this.pool.query("DELETE FROM memory");
-    await this.pool.query("DELETE FROM files");
+    await this.vectorStore.deleteAllRecords();
     this.log("✅ All existing data cleared");
 
     await this.sync();
@@ -122,50 +114,25 @@ export class RAG {
 
   public async query(query: string, k: number = 5) {
     // 1. Generate embedding
-    const embedding = await this.embedText([query]);
+    const [embedding] = await this.embedder.embed([query]);
 
-    // 2. Search DB - now handles both file-based and memory-based chunks
-    const res = await this.pool.query(
-      `
-      SELECT
-        mc.id,
-        mc.content,
-        COALESCE(f.path, 'memory') as source,
-        mc.embedding <-> $1::vector AS distance
-      FROM memory_chunks mc
-      LEFT JOIN files f ON mc.file_id = f.id
-      ORDER BY mc.embedding <-> $1::vector
-      LIMIT $2
-    `,
-      [`[${embedding.join(",")}]`, k]
-    );
-
-    return res.rows.map((row) => ({
-      id: row.id,
-      source: row.source,
-      content: row.content,
-      score: 1 - row.distance, // cosine similarity (closer to 1 = more similar)
-    }));
+    return this.vectorStore.query(embedding, k);
   }
 
   public async indexText(data: string) {
     // Create a new memory record instead of a file
-    const res = await this.pool.query(
-      "INSERT INTO memory (text, last_modified) VALUES ($1, $2) RETURNING id",
-      [data, new Date()]
-    );
-
-    const memoryId = res.rows[0].id;
+    const memoryId = await this.vectorStore.upsertMemory(data, new Date());
 
     // Chunk the text and create embeddings
     const chunks = this.chunkText(data, this.CHUNK_SIZE);
-    const embeddings = await this.embedText(chunks);
+    const embeddings = await this.embedder.embed(chunks);
 
     // Insert chunks with memory_id instead of file_id
     for (let i = 0; i < chunks.length; i++) {
-      await this.pool.query(
-        "INSERT INTO memory_chunks (memory_id, chunk_index, content, embedding) VALUES ($1, $2, $3, $4)",
-        [memoryId, i, chunks[i], `[${embeddings[i].join(",")}]`]
+      await this.vectorStore.insertChunksForMemory(
+        memoryId,
+        chunks,
+        embeddings
       );
     }
 
@@ -276,70 +243,8 @@ export class RAG {
     return splitRecursive(text, size, SEPARATORS);
   }
 
-  private async embedText(texts: string[]): Promise<number[][]> {
-    const resp = await this.openai.embeddings.create({
-      model: "text-embedding-3-small",
-      input: texts,
-    });
-    return resp.data.map((d) => d.embedding);
-  }
-
-  private async getFileRecord(filePath: string): Promise<any | null> {
-    const res = await this.pool.query("SELECT * FROM files WHERE path = $1", [
-      filePath,
-    ]);
-    return res.rows[0] || null;
-  }
-
-  private async upsertFile(
-    filePath: string,
-    lastModified: Date
-  ): Promise<number> {
-    const existing = await this.getFileRecord(filePath);
-
-    if (existing) {
-      await this.pool.query(
-        "UPDATE files SET last_modified = $1, last_indexed = $2 WHERE id = $3",
-        [lastModified, new Date(), existing.id]
-      );
-      return existing.id;
-    } else {
-      const res = await this.pool.query(
-        "INSERT INTO files (path, last_modified, last_indexed, created_at) VALUES ($1, $2, $3, CURRENT_TIMESTAMP) RETURNING id",
-        [filePath, lastModified, new Date()]
-      );
-      return res.rows[0].id;
-    }
-  }
-
   private async clearFileChunks(fileId: number) {
-    await this.pool.query("DELETE FROM memory_chunks WHERE file_id = $1", [
-      fileId,
-    ]);
-  }
-
-  private async insertChunks(
-    fileId: number,
-    chunks: string[],
-    embeddings: number[][]
-  ) {
-    for (let i = 0; i < chunks.length; i++) {
-      await this.pool.query(
-        "INSERT INTO memory_chunks (file_id, chunk_index, content, embedding) VALUES ($1, $2, $3, $4)",
-        [fileId, i, chunks[i], `[${embeddings[i].join(",")}]`]
-      );
-    }
-  }
-
-  private async getAllFileRecords(): Promise<any[]> {
-    const res = await this.pool.query("SELECT * FROM files");
-    return res.rows;
-  }
-
-  private async deleteFileRecord(fileId: number) {
-    // Due to CASCADE constraint, deleting from files will automatically
-    // delete all related chunks from memory_chunks table
-    await this.pool.query("DELETE FROM files WHERE id = $1", [fileId]);
+    await this.vectorStore.clearChunksForFile(fileId);
   }
 
   private getFilesFromDir(dir: string): string[] {

@@ -8,6 +8,11 @@ import { RAG } from "./rag/rag.ts";
 import { getRecipePrompt } from "./prompts.ts";
 import type { ToolCall } from "./clientsRegistry.ts";
 import { ConversationsStorage } from "./conversationsStorage.js";
+import { OpenAIEmbedder } from "./rag/embedders/OpenAIEmbedder.ts";
+import { TextAdapter } from "./rag/adapters/TextAdapter.ts";
+import { PdfAdapter } from "./rag/adapters/PdfAdapter.ts";
+import { PostgresVectorStore } from "./rag/storage/PostgresVectorStore.ts";
+import { Pool } from "pg";
 
 const PORT = 3000;
 const io = new Server(PORT, {
@@ -28,8 +33,28 @@ const openai = new OpenAI({
   baseURL: agentConfig.baseURL,
 });
 
+const rag = new RAG({
+  embedder: new OpenAIEmbedder({ apiKey: process.env.OPENAI_API_KEY ?? "" }),
+  filesystemIndexing: {
+    enabled: agentConfig.rag.filesystemIndexing.enabled,
+    workspaceDir: agentConfig.rag.filesystemIndexing.workspaceDir,
+    adapters: [new TextAdapter(), new PdfAdapter()],
+  },
+  vectorStore: new PostgresVectorStore(
+    new Pool({
+      host: process.env.POSTGRES_HOST ?? "localhost",
+      port: Number(process.env.POSTGRES_PORT ?? 5432),
+      user: process.env.POSTGRES_USER ?? "postgres",
+      password: process.env.POSTGRES_PASSWORD ?? "password",
+      database: process.env.POSTGRES_DB ?? "ragdb",
+    })
+  ),
+  logsAllowed: true,
+});
+
 const agent = new TinyAgent({
   maxInteractions: agentConfig.maxToolcallsPerInteraction,
+  rag,
 });
 
 // Initialize conversations storage
@@ -128,8 +153,8 @@ printSystemMessage(`MCP clients initialized in ${elapsedTime.toFixed(2)}s\n\n`);
 printSystemMessage(`Syncing RAG in the background...`);
 
 const startRag = Date.now();
-const rag = new RAG();
-rag.sync().catch(console.error);
+
+await rag.sync();
 
 printSystemMessage(`RAG synced in ${(Date.now() - startRag) / 1000}s\n\n`);
 
