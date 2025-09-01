@@ -65,56 +65,69 @@ export class RAG {
     // Deindex deleted files
     for (const deletedFile of deletedFiles) {
       this.log(`Deindexing deleted file: ${deletedFile.path}`);
-      await this.vectorStore.deleteFileRecord(deletedFile.id);
+      await this.vectorStore.deleteFile(deletedFile.id);
     }
 
     // Process existing files (index new/modified ones)
     for (const file of files) {
-      const filePath = path.join(dir, file);
-      const stat = fs.statSync(filePath);
-      if (!stat.isFile()) continue;
-
-      const lastModified = stat.mtime;
-      const existing = await this.vectorStore.getFileRecord(filePath);
-
-      if (
-        existing &&
-        new Date(existing.last_modified).getTime() === lastModified.getTime()
-      ) {
-        this.log(`Skipping unchanged file: ${file}`);
-        continue;
-      }
-
-      this.log(`Indexing file: ${file}`);
-
-      const adapter = this.filesystemIndexing.adapters.find((a) =>
-        a.supports(filePath)
-      );
-      if (!adapter) {
-        console.warn(`No adapter for file: ${file}, skipping...`);
-        continue;
-      }
-      const text = await adapter.load(filePath);
-      if (!text.trim()) {
-        console.warn(`File ${file} produced empty text, skipping...`);
-        continue;
-      }
-
-      const chunks = this.chunkText(text, {
-        chunkSize: this.textSplitter.options.chunkSize,
-        chunkOverlapPercentage:
-          this.textSplitter.options.chunkOverlapPercentage,
-      });
-      console.log("Chunks:", JSON.stringify(chunks, null, 2));
-      const embeddings = await this.embedder.embed(chunks);
-
-      const fileId = await this.vectorStore.upsertFile(filePath, lastModified);
-
-      await this.vectorStore.clearChunksForFile(fileId);
-      await this.vectorStore.insertChunksForFile(fileId, chunks, embeddings);
+      await this.syncFile(file);
     }
 
     this.log("✅ Sync complete");
+  }
+
+  public async syncFile(filePath: string) {
+    this.log(`🔄 Syncing file: ${filePath}`);
+
+    const exists = fs.existsSync(filePath);
+    if (!exists) {
+      this.log(`🔄 File ${filePath} deleted, deleting from database...`);
+      await this.vectorStore.deleteFileByPath(filePath);
+      return;
+    }
+
+    const stat = fs.statSync(filePath);
+    const lastModified = stat.mtime;
+    const existing = await this.vectorStore.getFileRecord(filePath);
+    if (
+      existing &&
+      new Date(existing.last_modified).getTime() === lastModified.getTime()
+    ) {
+      this.log(`🔄 Skipping unchanged file: ${filePath}`);
+      return;
+    }
+    this.log(`🔄 Indexing file: ${filePath}`);
+    const adapter = this.filesystemIndexing.adapters.find((a) =>
+      a.supports(filePath)
+    );
+    if (!adapter) {
+      console.warn(`No adapter for file: ${filePath}, skipping...`);
+      return;
+    }
+    const text = await adapter.load(filePath);
+    if (!text.trim()) {
+      console.warn(`File ${filePath} produced empty text, skipping...`);
+      return;
+    }
+    const chunks = this.chunkText(text, {
+      chunkSize: this.textSplitter.options.chunkSize,
+      chunkOverlapPercentage: this.textSplitter.options.chunkOverlapPercentage,
+    });
+    const embeddings = await this.embedder.embed(chunks);
+    const fileId = await this.vectorStore.upsertFile(filePath, lastModified);
+    await this.vectorStore.clearChunksForFile(fileId);
+    await this.vectorStore.insertChunksForFile(fileId, chunks, embeddings);
+    this.log(`✅ File ${filePath} indexed`);
+  }
+
+  public async listenForChanges() {
+    this.log("🔄 Starting to listen for changes...");
+    fs.watch(this.filesystemIndexing.workspaceDir, (eventType, filename) => {
+      if (!filename) return;
+      this.syncFile(
+        path.join(__dirname, this.filesystemIndexing.workspaceDir, filename)
+      );
+    });
   }
 
   public async reindexAll() {
@@ -288,7 +301,7 @@ export class RAG {
 
   private log(...args: any[]) {
     if (this.logsAllowed) {
-      console.log(...args);
+      console.log("[RAG]", ...args);
     }
   }
 }

@@ -159,6 +159,8 @@ await rag.sync();
 
 printSystemMessage(`RAG synced in ${(Date.now() - startRag) / 1000}s\n\n`);
 
+rag.listenForChanges();
+
 printSystemMessage(
   `Server is running on port ${PORT}. You can now start client with "npm run start-client"`
 );

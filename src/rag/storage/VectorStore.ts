@@ -3,6 +3,9 @@ export interface VectorStore {
   upsertFile(filePath: string, lastModified: Date): Promise<number>;
   deleteFile(fileId: number): Promise<void>;
 
+  // Needed for filesystem sync
+  deleteFileByPath(filePath: string): Promise<void>;
+
   // Memory-based operations
   upsertMemory(text: string, lastModified: Date): Promise<number>;
   deleteMemory(memoryId: number): Promise<void>;
@@ -43,6 +46,4 @@ export interface VectorStore {
   >;
 
   deleteAllRecords(): Promise<void>;
-  deleteFileRecord(fileId: number): Promise<void>;
-  deleteMemoryRecord(memoryId: number): Promise<void>;
 }

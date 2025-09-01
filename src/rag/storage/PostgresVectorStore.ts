@@ -156,11 +156,7 @@ export class PostgresVectorStore implements VectorStore {
     await this.pool.query("DELETE FROM files");
   }
 
-  async deleteFileRecord(fileId: number): Promise<void> {
-    await this.pool.query("DELETE FROM files WHERE id = $1", [fileId]);
-  }
-
-  async deleteMemoryRecord(memoryId: number): Promise<void> {
-    await this.pool.query("DELETE FROM memory WHERE id = $1", [memoryId]);
+  async deleteFileByPath(filePath: string): Promise<void> {
+    await this.pool.query("DELETE FROM files WHERE path = $1", [filePath]);
   }
 }
