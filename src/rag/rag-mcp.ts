@@ -25,11 +25,8 @@ const server = new McpServer(
 const rag = new RAG({
   logsAllowed: false, // Set to false as with MCP you cannot log on STDOUT
   embedder: new OpenAIEmbedder({ apiKey: process.env.OPENAI_API_KEY ?? "" }),
-  filesystemIndexing: {
-    enabled: true,
-    workspaceDir: process.env.DOCS_DIR ?? "",
-    adapters: [new TextAdapter(), new PdfAdapter()],
-  },
+  // As this is used only for MCP, we don't need to index the filesystem
+  // filesystemIndexingConfig is not passed => undefined
   vectorStore: new PostgresVectorStore(
     new Pool({
       host: process.env.POSTGRES_HOST ?? "localhost",

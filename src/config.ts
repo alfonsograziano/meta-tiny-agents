@@ -17,10 +17,11 @@ const configSchema = z.object({
 
   // RAG configuration
   rag: z.object({
-    filesystemIndexing: z.object({
-      enabled: z.boolean(),
-      workspaceDir: z.string(),
-    }),
+    filesystemIndexing: z
+      .object({
+        workspaceDir: z.string(),
+      })
+      .optional(),
     textSplitter: z.object({
       strategy: z.string(),
       options: z.object({

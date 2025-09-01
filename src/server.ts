@@ -33,13 +33,19 @@ const openai = new OpenAI({
   baseURL: agentConfig.baseURL,
 });
 
+const filesystemIndexingConfig = agentConfig.rag.filesystemIndexing;
+const defaultAdapters = [new TextAdapter(), new PdfAdapter()];
+
+const filesystemIndexing = filesystemIndexingConfig
+  ? {
+      workspaceDir: filesystemIndexingConfig.workspaceDir,
+      adapters: defaultAdapters,
+    }
+  : undefined;
+
 const rag = new RAG({
   embedder: new OpenAIEmbedder({ apiKey: process.env.OPENAI_API_KEY ?? "" }),
-  filesystemIndexing: {
-    enabled: agentConfig.rag.filesystemIndexing.enabled,
-    workspaceDir: agentConfig.rag.filesystemIndexing.workspaceDir,
-    adapters: [new TextAdapter(), new PdfAdapter()],
-  },
+  filesystemIndexing,
   vectorStore: new PostgresVectorStore(
     new Pool({
       host: process.env.POSTGRES_HOST ?? "localhost",
@@ -147,7 +153,7 @@ const clients = [
 ];
 
 const start = Date.now();
-Promise.all(clients);
+await Promise.all(clients);
 const elapsedTime = (Date.now() - start) / 1000;
 printSystemMessage(`MCP clients initialized in ${elapsedTime.toFixed(2)}s\n\n`);
 
@@ -200,7 +206,6 @@ io.on("connection", (socket) => {
   socket.on("get-conversation", async (input: { id: string }, callback) => {
     try {
       const conversation = await conversationsStorage.getConversation(input.id);
-      console.log("conversation", JSON.stringify(conversation, null, 2));
       if (!conversation) {
         callback({ status: "error", error: "Conversation not found" });
         return;

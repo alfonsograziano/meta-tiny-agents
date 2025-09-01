@@ -8,7 +8,6 @@
   "performRAGQueries": false,
   "rag": {
     "filesystemIndexing": {
-      "enabled": true,
       "workspaceDir": "./data"
     },
     "textSplitter": {

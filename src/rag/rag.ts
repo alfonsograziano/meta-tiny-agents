@@ -16,8 +16,7 @@ export interface RAGConfig {
   logsAllowed?: boolean;
   embedder: Embedder;
 
-  filesystemIndexing: {
-    enabled: boolean;
+  filesystemIndexing?: {
     workspaceDir: string;
     adapters: FileAdapter[];
   };
@@ -30,8 +29,7 @@ export interface RAGConfig {
 export class RAG {
   private vectorStore: VectorStore;
   private embedder: Embedder;
-  private filesystemIndexing: {
-    enabled: boolean;
+  private filesystemIndexing?: {
     workspaceDir: string;
     adapters: FileAdapter[];
   };
@@ -47,7 +45,7 @@ export class RAG {
   }
 
   public async sync() {
-    if (!this.filesystemIndexing.enabled) return;
+    if (!this.filesystemIndexing) return;
     const dir = this.filesystemIndexing.workspaceDir;
 
     const files = this.getFilesFromDir(dir);
@@ -77,6 +75,8 @@ export class RAG {
   }
 
   public async syncFile(filePath: string) {
+    if (!this.filesystemIndexing)
+      return this.log("🔄 No filesystem indexing configured, skipping...");
     this.log(`🔄 Syncing file: ${filePath}`);
 
     const exists = fs.existsSync(filePath);
@@ -121,12 +121,14 @@ export class RAG {
   }
 
   public async listenForChanges() {
+    if (!this.filesystemIndexing)
+      return this.log("🔄 No filesystem indexing configured, skipping...");
+    const workspaceDir = this.filesystemIndexing.workspaceDir;
     this.log("🔄 Starting to listen for changes...");
-    fs.watch(this.filesystemIndexing.workspaceDir, (eventType, filename) => {
+
+    fs.watch(workspaceDir, (eventType, filename) => {
       if (!filename) return;
-      this.syncFile(
-        path.join(__dirname, this.filesystemIndexing.workspaceDir, filename)
-      );
+      this.syncFile(path.join(__dirname, workspaceDir, filename));
     });
   }
 
@@ -286,16 +288,14 @@ export class RAG {
 
   private getFilesFromDir(dir: string): string[] {
     const allEntries = fs.readdirSync(dir, { recursive: true }) as string[];
-    this.log("Raw entries from readdirSync:", allEntries);
 
     const files = allEntries.filter((entry) => {
       const fullPath = path.join(dir, entry);
       const isFile = fs.statSync(fullPath).isFile();
-      this.log(`Entry: ${entry}, Full path: ${fullPath}, Is file: ${isFile}`);
       return isFile;
     });
 
-    this.log("Filtered files:", files);
+    this.log("Files found:", files);
     return files;
   }
 
