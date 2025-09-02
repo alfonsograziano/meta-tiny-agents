@@ -68,6 +68,7 @@ export function Chat() {
   const [isLoadingConversations, setIsLoadingConversations] = useState(false);
   const [conversationsLoaded, setConversationsLoaded] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const streamingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Auto-scroll to bottom
   const scrollToBottom = () => {
@@ -90,6 +91,17 @@ export function Chat() {
     const handleStreamAnswer = (chunk: string) => {
       // Accumulate streaming chunks
       setStreamingContent((prev) => prev + chunk);
+
+      // Clear any existing timeout
+      if (streamingTimeoutRef.current) {
+        clearTimeout(streamingTimeoutRef.current);
+      }
+
+      // Set a timeout to detect when streaming is complete
+      // If no more chunks arrive within 5 seconds, consider streaming complete
+      streamingTimeoutRef.current = setTimeout(() => {
+        setGenerating(false);
+      }, 5000);
     };
 
     const handleToolCall = (toolCall: ToolCall) => {
@@ -108,6 +120,11 @@ export function Chat() {
       socket.off("stream-answer", handleStreamAnswer);
       socket.off("tool-call", handleToolCall);
       socket.off("tool-call-result", handleToolCallResult);
+
+      // Clear any pending timeout
+      if (streamingTimeoutRef.current) {
+        clearTimeout(streamingTimeoutRef.current);
+      }
     };
   }, [
     socket,
@@ -134,26 +151,20 @@ export function Chat() {
     }
   }, [isConnected, loadTools]);
 
-  // Safety mechanism: reset generating state if it gets stuck
-  useEffect(() => {
-    if (state.isGenerating) {
-      const safetyTimeout = setTimeout(() => {
-        console.warn("Generating state stuck, resetting...");
-        setGenerating(false);
-      }, 10000); // 10 seconds max
-
-      return () => clearTimeout(safetyTimeout);
-    }
-  }, [state.isGenerating, setGenerating]);
-
   // Handle streaming completion - add streaming content to conversation when generating stops
   useEffect(() => {
     if (!state.isGenerating && streamingContent) {
+      // Clear any pending timeout since streaming is complete
+      if (streamingTimeoutRef.current) {
+        clearTimeout(streamingTimeoutRef.current);
+        streamingTimeoutRef.current = null;
+      }
+
       // Add the streaming content to the conversation when generating stops
       addAssistantMessage(streamingContent);
       setStreamingContent("");
     }
-  }, [state.isGenerating, addAssistantMessage]);
+  }, [state.isGenerating, streamingContent, addAssistantMessage]);
 
   // Sync streaming content with streamed message
   useEffect(() => {
@@ -196,8 +207,7 @@ export function Chat() {
       });
 
       // The response will be handled by socket streaming events
-      // Set generating to false when the server callback is received (streaming complete)
-      setGenerating(false);
+      // Don't set generating to false here - let the streaming completion logic handle it
     } catch (err) {
       console.error("Failed to generate answer:", err);
       addAssistantMessage(
