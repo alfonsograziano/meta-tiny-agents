@@ -90,7 +90,6 @@ export function Chat() {
     const handleStreamAnswer = (chunk: string) => {
       // Accumulate streaming chunks
       setStreamingContent((prev) => prev + chunk);
-      setStreamedMessage(streamingContent + chunk);
     };
 
     const handleToolCall = (toolCall: ToolCall) => {
@@ -115,7 +114,6 @@ export function Chat() {
     addToolCall,
     addToolResult,
     setStreamedMessage,
-    streamingContent,
     addAssistantMessage,
     setGenerating,
   ]);
@@ -155,7 +153,14 @@ export function Chat() {
       addAssistantMessage(streamingContent);
       setStreamingContent("");
     }
-  }, [state.isGenerating, streamingContent, addAssistantMessage]);
+  }, [state.isGenerating, addAssistantMessage]);
+
+  // Sync streaming content with streamed message
+  useEffect(() => {
+    if (streamingContent) {
+      setStreamedMessage(streamingContent);
+    }
+  }, [streamingContent, setStreamedMessage]);
 
   const handleSendMessage = async (message: string) => {
     if (!isConnected) return;
@@ -191,7 +196,7 @@ export function Chat() {
       });
 
       // The response will be handled by socket streaming events
-      // We just need to stop the generating state
+      // Set generating to false when the server callback is received (streaming complete)
       setGenerating(false);
     } catch (err) {
       console.error("Failed to generate answer:", err);
