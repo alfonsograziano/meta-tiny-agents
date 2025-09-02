@@ -149,7 +149,7 @@ function HomePageContent() {
             <div className="flex items-center gap-4">
               <Bot className="w-12 h-12 text-blue-400" />
               <div>
-                <h1 className="text-3xl font-bold">Tiny Agents Chat</h1>
+                <h1 className="text-3xl font-bold">Tiny Agent Chat</h1>
                 <p className="text-gray-400">
                   Your AI-powered conversation assistant
                 </p>

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Tiny Agents Chat",
+  title: "Tiny Agent Chat",
   description: "A ChatGPT-style chat interface for Tiny Agents",
 };
 

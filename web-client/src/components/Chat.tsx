@@ -465,7 +465,7 @@ export function Chat() {
           <div className="flex items-center gap-3">
             <Bot className="w-8 h-8 text-blue-400" />
             <div className="flex flex-col gap-1">
-              <h1 className="text-xl font-bold text-white">Tiny Agents Chat</h1>
+              <h1 className="text-xl font-bold text-white">Tiny Agent Chat</h1>
               <ConnectionStatus />
               {state.currentConversationId && (
                 <div className="text-xs text-blue-300">
@@ -487,13 +487,20 @@ export function Chat() {
               </div>
             )}
 
-            {/* Back to conversations button */}
+            {/* Conversations toggle button */}
             <button
-              onClick={() => router.push("/")}
+              onClick={() =>
+                setConversationsSidebarOpen(!conversationsSidebarOpen)
+              }
               className="bg-gray-700 hover:bg-gray-600 text-gray-300 hover:text-white px-3 py-1 rounded-lg transition-colors flex items-center gap-2"
+              title={
+                conversationsSidebarOpen
+                  ? "Close conversations"
+                  : "Open conversations"
+              }
             >
               <MessageSquare className="w-4 h-4" />
-              Conversations
+              {conversationsSidebarOpen ? "Close" : "Conversations"}
             </button>
 
             {/* Tools button */}

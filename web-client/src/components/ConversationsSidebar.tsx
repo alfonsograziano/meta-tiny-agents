@@ -92,15 +92,6 @@ export function ConversationsSidebar({
 
   return (
     <>
-      {/* Toggle button */}
-      <button
-        onClick={onToggle}
-        className="fixed top-4 left-4 z-50 bg-gray-800 hover:bg-gray-700 text-white p-2 rounded-lg transition-colors"
-        title={isOpen ? "Close conversations" : "Open conversations"}
-      >
-        <MessageSquare className="w-5 h-5" />
-      </button>
-
       {/* Sidebar */}
       <div
         className={`fixed left-0 top-0 h-full bg-gray-900 border-r border-gray-700 transition-transform duration-300 z-40 ${
@@ -110,8 +101,8 @@ export function ConversationsSidebar({
       >
         <div className="p-4 h-full flex flex-col">
           {/* Header */}
-          <div className="mb-6">
-            <div className="flex items-center justify-between mb-2">
+          <div className="mb-6 pt-4">
+            <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-bold text-white">Conversations</h2>
               <button
                 onClick={onRefreshConversations}
