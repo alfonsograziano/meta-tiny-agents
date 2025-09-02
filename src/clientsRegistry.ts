@@ -68,7 +68,10 @@ export class ClientsRegistry {
     command: string,
     args: string[],
     env: Record<string, string>
-  ): Promise<void> {
+  ): Promise<{
+    client: Client;
+    name: string;
+  }> {
     let transport;
     if (transportType === "stdio") {
       transport = new StdioClientTransport({
@@ -90,6 +93,7 @@ export class ClientsRegistry {
     const client = new Client({ name, version: "1.0.0" });
     await client.connect(transport);
     this.clients[name] = client;
+    return { client, name };
   }
 
   /**

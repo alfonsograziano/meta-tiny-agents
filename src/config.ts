@@ -30,6 +30,15 @@ const configSchema = z.object({
       }),
     }),
   }),
+  mcpServers: z
+    .record(
+      z.object({
+        command: z.string(),
+        args: z.array(z.string()),
+        env: z.record(z.string(), z.string()).optional(),
+      })
+    )
+    .optional(),
 });
 
 const partialAgentConfig = configSchema.parse(

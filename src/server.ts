@@ -78,6 +78,17 @@ printSystemMessage("Initializing MCP clients...");
 const ua =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36";
 
+const customMcpServers = Object.entries(agentConfig.mcpServers || {}).map(
+  ([name, server]) => {
+    return agent
+      .getClientsRegistry()
+      .register("stdio", name, server.command, server.args, {
+        ...server.env,
+        PATH: process.env.PATH!,
+      });
+  }
+);
+
 const clients = [
   agent
     .getClientsRegistry()
@@ -150,6 +161,11 @@ const clients = [
     .then(() => {
       console.log("[MCP]: Smart Fetch client initialized");
     }),
+  ...customMcpServers.map((server) =>
+    server.then(({ name }) => {
+      console.log(`[MCP]: ${name} client initialized`);
+    })
+  ),
 ];
 
 const start = Date.now();

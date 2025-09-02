@@ -17,5 +17,14 @@
         "chunkOverlapPercentage": 10
       }
     }
+  },
+  "mcpServers": {
+    "everything": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-everything"],
+      "env": {
+        "TEST": "test"
+      }
+    }
   }
 }
