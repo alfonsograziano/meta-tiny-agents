@@ -150,10 +150,7 @@ export class RAG {
     return this.vectorStore.query(embedding, k);
   }
 
-  public async indexText(data: string) {
-    // Create a new memory record instead of a file
-    const memoryId = await this.vectorStore.upsertMemory(data, new Date());
-
+  public async indexMemoryById(memoryId: number, data: string) {
     // Chunk the text and create embeddings
     const chunks = this.chunkText(data, {
       chunkSize: this.textSplitter.options.chunkSize,
@@ -171,6 +168,50 @@ export class RAG {
     }
 
     this.log(`Indexed text as memory with ${chunks.length} chunks`);
+    return memoryId;
+  }
+
+  // Memory management methods
+  public async createMemory(content: string) {
+    const memoryId = await this.vectorStore.upsertMemory(content, new Date());
+
+    await this.indexMemoryById(memoryId, content);
+
+    const memoryRecord = await this.vectorStore.getMemoryRecord(memoryId);
+    if (!memoryRecord) {
+      throw new Error("Failed to create memory record");
+    }
+    return memoryRecord;
+  }
+
+  public async getMemory(id: number) {
+    return this.vectorStore.getMemoryRecord(id);
+  }
+
+  public async listMemories() {
+    return this.vectorStore.getAllMemoryRecords();
+  }
+
+  public async updateMemory(id: number, content: string) {
+    const existingMemory = await this.vectorStore.getMemoryRecord(id);
+    if (!existingMemory) {
+      return null;
+    }
+
+    await this.vectorStore.clearChunksForMemory(id);
+    await this.vectorStore.updateMemory(id, content);
+    await this.indexMemoryById(id, content);
+
+    return this.vectorStore.getMemoryRecord(id);
+  }
+
+  public async deleteMemory(id: number) {
+    const existingMemory = await this.vectorStore.getMemoryRecord(id);
+    if (!existingMemory) {
+      return false;
+    }
+    await this.vectorStore.deleteMemory(id);
+    return true;
   }
 
   // ---------- PRIVATE HELPERS ----------

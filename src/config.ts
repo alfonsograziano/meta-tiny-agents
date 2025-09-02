@@ -9,7 +9,6 @@ const configSchema = z.object({
   // But you want to keep a smaller model for things like chat title generation or
   // other non-critical tasks
   helperModel: z.string().optional(),
-  saveConversations: z.boolean().optional().default(false),
   baseURL: z.string().optional(),
   enableStreaming: z.boolean().optional().default(false),
   // Whether to perform RAG queries at each interaction

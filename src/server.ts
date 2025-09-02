@@ -13,8 +13,11 @@ import { TextAdapter } from "./rag/adapters/TextAdapter.ts";
 import { PdfAdapter } from "./rag/adapters/PdfAdapter.ts";
 import { PostgresVectorStore } from "./rag/storage/PostgresVectorStore.ts";
 import { Pool } from "pg";
+import { RestApiServer } from "./restApi.js";
 
 const PORT = 3000;
+const REST_PORT = 3002;
+
 const io = new Server(PORT, {
   cors: {
     origin: ["http://localhost:3001", "http://localhost:3000"],
@@ -187,6 +190,14 @@ printSystemMessage(
   `Server is running on port ${PORT}. You can now start client with "npm run start-client"`
 );
 
+// Initialize and start REST API server
+const restApiServer = new RestApiServer({ rag });
+await restApiServer.initialize({
+  port: REST_PORT,
+  host: "0.0.0.0",
+  corsOrigins: ["http://localhost:3001", "http://localhost:3000"],
+});
+
 io.on("connection", (socket) => {
   console.log("Client connected:", socket.id);
 
@@ -358,7 +369,7 @@ io.on("connection", (socket) => {
       });
       const recipeContent = recipe.conversation[recipe.conversation.length - 1]
         .content as string;
-      await rag.indexText(recipeContent);
+      await rag.createMemory(recipeContent);
 
       callback({ status: "ok", result: recipeContent });
     }

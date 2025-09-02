@@ -20,10 +20,12 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "@fastify/cors": "^10.0.1",
     "@modelcontextprotocol/sdk": "^1.12.1",
     "db-migrate": "^0.11.14",
     "db-migrate-pg": "^1.5.2",
     "dotenv": "^17.2.1",
+    "fastify": "^5.1.0",
     "openai": "^5.1.1",
     "pdf-parse": "^1.1.1",
     "pg": "^8.16.3",

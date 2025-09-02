@@ -88,7 +88,7 @@ server.tool(
   storeMemorySchema,
   async (params) => {
     const { memory } = params;
-    await rag.indexText(memory);
+    await rag.createMemory(memory);
     return {
       content: [{ type: "text", text: "✅ Memory stored successfully." }],
     };

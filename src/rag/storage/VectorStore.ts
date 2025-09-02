@@ -46,4 +46,6 @@ export interface VectorStore {
   >;
 
   deleteAllRecords(): Promise<void>;
+
+  updateMemory(memoryId: number, content: string): Promise<void>;
 }

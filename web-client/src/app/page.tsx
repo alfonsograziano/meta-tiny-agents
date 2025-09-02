@@ -6,7 +6,15 @@ import { ChatProvider } from "../contexts/ChatContext";
 import { useSocket } from "../hooks/useSocket";
 import { useChat } from "../contexts/ChatContext";
 import { StoredConversation } from "../types";
-import { Bot, Plus, MessageSquare, Clock, Trash2, Edit3 } from "lucide-react";
+import {
+  Bot,
+  Plus,
+  MessageSquare,
+  Clock,
+  Trash2,
+  Edit3,
+  Brain,
+} from "lucide-react";
 
 function HomePageContent() {
   const router = useRouter();
@@ -137,24 +145,35 @@ function HomePageContent() {
       {/* Header */}
       <div className="bg-gray-800 border-b border-gray-700 p-6">
         <div className="max-w-4xl mx-auto">
-          <div className="flex items-center gap-4 mb-6">
-            <Bot className="w-12 h-12 text-blue-400" />
-            <div>
-              <h1 className="text-3xl font-bold">Tiny Agents Chat</h1>
-              <p className="text-gray-400">
-                Your AI-powered conversation assistant
-              </p>
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-4">
+              <Bot className="w-12 h-12 text-blue-400" />
+              <div>
+                <h1 className="text-3xl font-bold">Tiny Agents Chat</h1>
+                <p className="text-gray-400">
+                  Your AI-powered conversation assistant
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => router.push("/memories")}
+                className="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-lg transition-colors flex items-center gap-2 font-medium"
+              >
+                <Brain className="w-4 h-4" />
+                Memories
+              </button>
+              <button
+                onClick={handleCreateConversation}
+                disabled={isLoading}
+                className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 text-white px-6 py-3 rounded-lg transition-colors flex items-center gap-2 font-medium"
+              >
+                <Plus className="w-5 h-5" />
+                New Conversation
+              </button>
             </div>
           </div>
-
-          <button
-            onClick={handleCreateConversation}
-            disabled={isLoading}
-            className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 text-white px-6 py-3 rounded-lg transition-colors flex items-center gap-2 font-medium"
-          >
-            <Plus className="w-5 h-5" />
-            New Conversation
-          </button>
         </div>
       </div>
 

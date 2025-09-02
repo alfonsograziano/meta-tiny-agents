@@ -84,3 +84,19 @@ export interface GenerateAnswerResponse {
   content: string;
   streamed: boolean;
 }
+
+// Memory types
+export interface Memory {
+  id: number;
+  text: string;
+  last_modified: Date;
+  created_at: Date;
+}
+
+export interface CreateMemoryRequest {
+  content: string;
+}
+
+export interface UpdateMemoryRequest {
+  content: string;
+}

@@ -3,7 +3,6 @@
   "maxToolcallsPerInteraction": 10,
   "model": "gpt-5-nano",
   "helperModel": "gpt-5-nano",
-  "saveConversations": true,
   "enableStreaming": true,
   "performRAGQueries": false,
   "rag": {
