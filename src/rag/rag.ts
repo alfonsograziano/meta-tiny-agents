@@ -128,7 +128,7 @@ export class RAG {
 
     fs.watch(workspaceDir, (eventType, filename) => {
       if (!filename) return;
-      this.syncFile(path.join(__dirname, workspaceDir, filename));
+      this.syncFile(path.join(workspaceDir, filename));
     });
   }
 
